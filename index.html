@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Einnahmen V55</title>
+<style>
+body { margin:0; padding:0; }
+.container { max-width:600px; margin:0 auto; background:white; padding:20px; }
+h1 { margin-top:0; }
+
+#selected-month {
+  font-weight:bold;
+  font-size:1.6em;
+  color:#b30000;
+  background:#ffe5e5;
+  padding:5px 12px;
+  border-radius:8px;
+}
+
+#month-nav { font-size:1.4em; margin:10px 0; display:flex; align-items:center; justify-content:space-between; }
+.nav { cursor:pointer; font-weight:bold; padding:0 10px; }
+
+table { width:100%; border-collapse:collapse; background:#f5f5dc; }
+th, td { border:1px solid black; padding:6px; text-align:center; }
+
+.amount1, .amount2, #total-tip {
+  width:100%;
+  box-sizing:border-box;
+  padding:8px;
+  border:1px solid black;
+  text-align:center;
+}
+.empty-input { background-color:lightgray; }
+.amount1:not(.empty-input),
+.amount2:not(.empty-input),
+#total-tip:not(.empty-input) { font-weight:bold; }
+
+.weekend, .holiday, .customfree {
+  background:#ddd;
+  font-weight:bold;
+  font-style:italic;
+}
+.day-cell { cursor:pointer; font-weight:bold; }
+
+/* Druckmodus optimieren */
+@media print {
+  button, input[type=file] {
+    display:none !important;
+  }
+  body {
+    color:black !important;
+    background:white !important;
+  }
+  #selected-month {
+    background:white !important;
+    color:black !important;
+  }
+}
+
+
+@media print {
+  .print-summary { page-break-before: always; display:block !important; }
+}
+
+
+.nav-btn {
+  font-size: 1.4em;
+  padding: 6px 12px;
+  margin: 0 10px;
+  cursor: pointer;
+  font-weight: bold;
+  border: 2px solid #444;
+  background: #eee;
+  border-radius: 6px;
+}
+
+.amount2-wrapper {
+  margin-bottom: 2px;
+}
+
+.toggle-amount2 {
+  font-size: 0.8em;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+</style>
+<script>
+// --- Globale Variablen ---
+const monthNames = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+let now = new Date();
+let selMonth = now.getMonth();
+let selYear = now.getFullYear();
+let selDays = 0;
+let holidays = {};
+
+// --- Hilfsfunktionen Datum ---
+function daysInMonth(y, m){ return new Date(y, m+1, 0).getDate(); }
+
+function fmt(d){
+  return d.getFullYear() + "-" +
+         String(d.getMonth()+1).padStart(2,"0") + "-" +
+         String(d.getDate()).padStart(2,"0");
+}
+function addDays(d, x){
+  let n = new Date(d);
+  n.setDate(n.getDate() + x);
+  return n;
+}
+
+// Ostersonntag nach Gauß
+function calcEaster(Y){
+  let a = Y % 19;
+  let b = Math.floor(Y / 100);
+  let c = Y % 100;
+  let d = Math.floor(b / 4);
+  let e = b % 4;
+  let f = Math.floor((b + 8) / 25);
+  let g = Math.floor((b - f + 1) / 3);
+  let h = (19*a + b - d - g + 15) % 30;
+  let i = Math.floor(c / 4);
+  let k = c % 4;
+  let l = (32 + 2*e + 2*i - h - k) % 7;
+  let m = Math.floor((a + 11*h + 22*l) / 451);
+  let month = Math.floor((h + l - 7*m + 114) / 31);
+  let day = ((h + l - 7*m + 114) % 31) + 1;
+  return new Date(Y, month - 1, day);
+}
+
+function getNRWHolidays(year){
+  let easter = calcEaster(year);
+  let H = {};
+  H[fmt(new Date(year,0,1))]  = "Neujahr";
+  H[fmt(new Date(year,4,1))]  = "Tag der Arbeit";
+  H[fmt(new Date(year,9,3))]  = "Tag der Deutschen Einheit";
+  H[fmt(new Date(year,11,25))] = "1. Weihnachtstag";
+  H[fmt(new Date(year,11,26))] = "2. Weihnachtstag";
+  H[fmt(new Date(year,10,1))] = "Allerheiligen";
+  H[fmt(addDays(easter,-2))]  = "Karfreitag";
+  H[fmt(addDays(easter, 1))]  = "Ostermontag";
+  H[fmt(addDays(easter,39))]  = "Christi Himmelfahrt";
+  H[fmt(addDays(easter,50))]  = "Pfingstmontag";
+  H[fmt(addDays(easter,60))]  = "Fronleichnam";
+  return H;
+}
+
+// --- Design-Helfer ---
+function checkInput(input){
+  if(!input) return;
+  if(input.value === "") input.classList.add("empty-input");
+  else input.classList.remove("empty-input");
+}
+
+function toggleAmount2(btn, day){
+  const wrapper = btn.parentElement.querySelector(".amount2-wrapper");
+  const input = wrapper.querySelector(".amount2");
+  if(wrapper.style.display === "none" || wrapper.style.display === ""){
+    wrapper.style.display = "block";
+    btn.textContent = "− Betrag 2";
+  } else {
+    wrapper.style.display = "none";
+    input.value = "";
+    checkInput(input);
+    btn.textContent = "+ Betrag 2";
+    updateDay(day);
+  }
+}
+
+function handleEnter(e){
+  if(e.key === "Enter"){
+    e.preventDefault();
+    const currentRow = e.target.closest("tr.entry-row");
+    if(!currentRow) return;
+    const tbody = currentRow.parentElement;
+    if(!tbody || !tbody.id || !tbody.id.startsWith("day-")) return;
+
+    const rows = Array.from(tbody.querySelectorAll("tr.entry-row"));
+    const idx = rows.indexOf(currentRow);
+    if(idx === -1) return;
+
+    // Wenn es eine weitere Zeile im selben Tag gibt → dorthin springen
+    if(idx < rows.length - 1){
+      const nextRow = rows[idx + 1];
+      const nextInput = nextRow.querySelector("input.amount1");
+      if(nextInput){
+        nextInput.focus();
+        if(typeof nextInput.select === "function"){
+          nextInput.select();
+        }
+      }
+    } else {
+      // Letzte Zeile dieses Tages: neue Zeile anlegen und dorthin springen
+      const dayStr = tbody.id.split("-")[1];
+      const day = parseInt(dayStr, 10);
+      if(!isNaN(day)){
+        addRow(day);
+        const newRows = tbody.querySelectorAll("tr.entry-row");
+        const lastRow = newRows[newRows.length - 1];
+        const input = lastRow.querySelector("input.amount1");
+        if(input){
+          input.focus();
+          if(typeof input.select === "function"){
+            input.select();
+          }
+        }
+      }
+    }
+  }
+}
+
+// Eigene freie Tage speichern / lesen
+function toggleFreeDay(day){
+  const key = "cf-" + selYear + "-" + selMonth + "-" + day;
+  if(localStorage.getItem(key)) localStorage.removeItem(key);
+  else localStorage.setItem(key, "1");
+  updateMonth();  // neu aufbauen
+}
+function isFreeDay(day){
+  return localStorage.getItem("cf-" + selYear + "-" + selMonth + "-" + day) !== null;
+}
+
+// Monatsnavigation
+function prevMonth(){
+  selMonth--;
+  if(selMonth < 0){ selMonth = 11; selYear--; }
+  updateMonth();
+}
+function nextMonth(){
+  selMonth++;
+  if(selMonth > 11){ selMonth = 0; selYear++; }
+  updateMonth();
+}
+
+function updateMonth(){
+  document.getElementById("selected-month").innerText =
+    monthNames[selMonth] + " " + selYear;
+
+  selDays = daysInMonth(selYear, selMonth);
+  holidays = getNRWHolidays(selYear);
+
+  buildTable();
+  loadAllDays();
+  updateTotals();
+}
+
+// Tabelle aufbauen
+function buildTable(){
+  const table = document.getElementById("main-table");
+  const tfoot = document.querySelector("tfoot");
+  document.querySelectorAll("tbody.dayblock").forEach(e => e.remove());
+
+  for(let day = 1; day <= selDays; day++){
+    const date = new Date(selYear, selMonth, day);
+    const weekday = date.toLocaleDateString("de-DE",{weekday:"long"}).toLowerCase();
+    const ds = fmt(date);
+    const isHoliday = (holidays[ds] != null);
+    const isWeekend = (weekday === "samstag" || weekday === "sonntag");
+    const isFree = isFreeDay(day);
+
+    let tb = document.createElement("tbody");
+    tb.classList.add("dayblock");
+    tb.id = "day-" + day;
+
+    if(isHoliday){
+      tb.innerHTML = `<tr class="holiday">
+        <td class="day-cell" onclick="toggleFreeDay(${day})">${day}<br><small>Feiertag</small></td>
+        <td colspan="4">Kein Arbeitstag</td>
+      </tr>
+        <tr class="day-summary">
+          <td></td><td></td><td></td>
+          <td id="sum-${day}">0.00</td>
+          <td id="cnt-${day}">0</td>
+        </tr>
+        `;
+    } else if(isWeekend){
+      tb.innerHTML = `<tr class="weekend">
+        <td class="day-cell" onclick="toggleFreeDay(${day})">${day}<br><small>${weekday}</small></td>
+        <td colspan="4">Kein Arbeitstag</td>
+      </tr>
+        <tr class="day-summary">
+          <td></td><td></td><td></td>
+          <td id="sum-${day}">0.00</td>
+          <td id="cnt-${day}">0</td>
+        </tr>
+        `;
+    } else if(isFree){
+      tb.innerHTML = `<tr class="customfree">
+        <td class="day-cell" onclick="toggleFreeDay(${day})">${day}<br><small>Eigener freier Tag</small></td>
+        <td colspan="4">Kein Arbeitstag</td>
+      </tr>
+        <tr class="day-summary">
+          <td></td><td></td><td></td>
+          <td id="sum-${day}">0.00</td>
+          <td id="cnt-${day}">0</td>
+        </tr>
+        `;
+    } else {
+      tb.innerHTML = `
+        <tr><td colspan="5"><button onclick="addRow(${day})">Neue Zeile für ${day}</button></td></tr>
+        <tr class="entry-row">
+          <td class="day-cell" onclick="toggleFreeDay(${day})">${day}</td>
+          <td><input class="amount1 empty-input" type="number" oninput="checkInput(this); updateDay(${day})" onkeydown="handleEnter(event)"></td>
+          <td>
+            <div class="amount2-wrapper" style="display:none;">
+              <input class="amount2 empty-input" type="number" oninput="checkInput(this); updateDay(${day})" onkeydown="handleEnter(event)">
+            </div>
+            <button type="button" class="toggle-amount2" onclick="toggleAmount2(this, ${day})">+ Betrag 2</button>
+          </td>
+          <td></td>
+          <td></td>
+        </tr>
+        <tr class="day-summary">
+          <td></td><td></td><td></td>
+          <td id="sum-${day}">0.00</td>
+          <td id="cnt-${day}">0</td>
+        </tr>
+        `;
+    }
+    table.insertBefore(tb, tfoot);
+  }
+}
+
+function addRow(day){
+  const tb = document.getElementById("day-" + day);
+  const tr = document.createElement("tr");
+  tr.classList.add("entry-row");
+  tr.innerHTML = `
+    <td></td>
+    <td><input class="amount1 empty-input" type="number" oninput="checkInput(this); updateDay(${day})" onkeydown="handleEnter(event)"></td>
+    <td>
+      <div class="amount2-wrapper" style="display:none;">
+        <input class="amount2 empty-input" type="number" oninput="checkInput(this); updateDay(${day})" onkeydown="handleEnter(event)">
+      </div>
+      <button type="button" class="toggle-amount2" onclick="toggleAmount2(this, ${day})">+ Betrag 2</button>
+    </td>
+    <td></td>
+    <td></td>`;
+  const summary = tb.querySelector("tr.day-summary");
+  if(summary){
+    tb.insertBefore(tr, summary);
+  } else {
+    tb.appendChild(tr);
+  }
+}
+
+// Schlüssel für localStorage
+function dayKey(day){
+  return "day-" + selYear + "-" + selMonth + "-" + day;
+}
+
+// Tag neu berechnen und speichern
+function updateDay(day){
+  let sum = 0;
+  let customers = 0;
+  document.querySelectorAll("#day-" + day + " .entry-row").forEach(row => {
+    const a1 = parseFloat(row.querySelector(".amount1")?.value) || 0;
+    const a2 = parseFloat(row.querySelector(".amount2")?.value) || 0;
+    if(a1 > 0 || a2 > 0) customers++;
+    sum += a1 + a2;
+  });
+  document.getElementById("sum-" + day).innerText = sum.toFixed(2);
+  document.getElementById("cnt-" + day).innerText = customers;
+
+  saveDay(day);
+  updateTotals();
+}
+
+function saveDay(day){
+  const rows = [...document.querySelectorAll("#day-" + day + " .entry-row")].map(row => ({
+    amount1: row.querySelector(".amount1")?.value || "",
+    amount2: row.querySelector(".amount2")?.value || ""
+  }));
+  localStorage.setItem(dayKey(day), JSON.stringify(rows));
+}
+
+function loadDay(day){
+  const raw = localStorage.getItem(dayKey(day));
+  if(!raw) return;
+  const rows = JSON.parse(raw);
+  const tb = document.getElementById("day-" + day);
+  if(!tb) return;
+
+  rows.forEach((r, idx) => {
+    if(idx > 0) addRow(day);
+    const row = tb.querySelectorAll(".entry-row")[idx];
+    const a1 = row.querySelector(".amount1");
+    const a2 = row.querySelector(".amount2");
+    const wrapper = row.querySelector(".amount2-wrapper");
+    const toggleBtn = row.querySelector(".toggle-amount2");
+
+    // Kompatibilität: sowohl amount1/amount2 als auch a1/a2 akzeptieren
+    a1.value = r.amount1 !== undefined ? r.amount1 : (r.a1 || "");
+    a2.value = r.amount2 !== undefined ? r.amount2 : (r.a2 || "");
+
+    checkInput(a1);
+    checkInput(a2);
+
+    if(wrapper){
+      if(a2.value !== ""){
+        wrapper.style.display = "block";
+        if(toggleBtn) toggleBtn.textContent = "− Betrag 2";
+      } else {
+        wrapper.style.display = "none";
+        if(toggleBtn) toggleBtn.textContent = "+ Betrag 2";
+      }
+    }
+  });
+
+  updateDay(day);
+}
+
+function loadAllDays(){
+  for(let d = 1; d <= selDays; d++){
+    loadDay(d);
+  }
+  const tip = document.getElementById("total-tip");
+  tip.value = localStorage.getItem("totalTip") || "";
+  checkInput(tip);
+}
+
+// Gesamtsummen
+function updateTotals(){
+  let total = 0;
+  let totalCustomers = 0;
+  for(let d = 1; d <= selDays; d++){
+    const s = parseFloat(document.getElementById("sum-" + d)?.innerText) || 0;
+    const c = parseInt(document.getElementById("cnt-" + d)?.innerText) || 0;
+    total += s;
+    totalCustomers += c;
+  }
+  document.getElementById("grand-total").innerText = total.toFixed(2);
+  const grandCustomersEl = document.getElementById("grand-customers");
+  if (grandCustomersEl) grandCustomersEl.innerText = totalCustomers;
+
+  const tipInput = document.getElementById("total-tip");
+  const tip = parseFloat(tipInput.value) || 0;
+  localStorage.setItem("totalTip", tip);
+
+  const withTip = total + tip;
+  document.getElementById("with-tip").innerText = withTip.toFixed(2);
+
+  const net = withTip / 1.19;
+  document.getElementById("net-total").innerText = net.toFixed(2);
+  document.getElementById("tax-total").innerText = (withTip - net).toFixed(2);
+}
+
+// JSON Export / Import
+function exportJSON(){
+  const data = {
+    year: selYear,
+    month: selMonth,
+    days: {},
+    free: {},
+    totalTip: localStorage.getItem("totalTip") || ""
+  };
+
+  for(let d = 1; d <= selDays; d++){
+    const key = dayKey(d);
+    const raw = localStorage.getItem(key);
+    if(raw) data.days[key] = JSON.parse(raw);
+
+    const cf = "cf-" + selYear + "-" + selMonth + "-" + d;
+    if(localStorage.getItem(cf)) data.free[cf] = 1;
+  }
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "einnahmen_" + selYear + "-" + String(selMonth+1).padStart(2,"0") + ".json";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importJSON(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const data = JSON.parse(e.target.result);
+      if(data.days){
+        for(const key in data.days){
+          localStorage.setItem(key, JSON.stringify(data.days[key]));
+        }
+      }
+      if(data.free){
+        for(const key in data.free){
+          localStorage.setItem(key, "1");
+        }
+      }
+      if(data.totalTip !== undefined){
+        localStorage.setItem("totalTip", data.totalTip);
+      }
+      alert("Import erfolgreich. Seite wird neu geladen.");
+      location.reload();
+    }catch(err){
+      alert("Fehler beim Import: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// Alle gespeicherten Daten löschen
+function clearAllData(){
+  Object.keys(localStorage).forEach(k=>{
+    if(k.startsWith("day-")||k.startsWith("cf-")||k==="totalTip") localStorage.removeItem(k);
+  });
+  alert("Alle Daten gelöscht");
+  location.reload();
+}
+
+// CSV Export
+function exportCSV(){
+  let lines=["Tag;Betrag1;Betrag2"];
+  for(let d=1; d<=selDays; d++){
+    let rows = document.querySelectorAll("#day-"+d+" .entry-row");
+    rows.forEach(r=>{
+      let a1 = r.querySelector(".amount1")?.value || "";
+      let a2 = r.querySelector(".amount2")?.value || "";
+      lines.push(`${d};${a1};${a2}`);
+    });
+  }
+  let blob=new Blob([lines.join("\n")],{type:"text/csv"});
+  let url=URL.createObjectURL(blob);
+  let a=document.createElement("a");
+  a.href=url;
+  a.download="einnahmen.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+</script>
+</head>
+<body onload="updateMonth()">
+<div class="container">
+<h1>Einnahmen V55</h1>
+
+<div id="month-nav">
+  <button class="nav-btn" onclick="prevMonth()">◄</button>
+  <span id="selected-month"></span>
+  <button class="nav-btn" onclick="nextMonth()">►</button>
+</div>
+
+<table id="main-table">
+  <thead>
+    <tr>
+      <th>Tag</th>
+      <th>Betrag 1</th>
+      <th>Betrag 2</th>
+      <th>Summe</th>
+      <th>Kunden</th>
+    </tr>
+  </thead>
+  <tfoot></tfoot>
+</table>
+<div style="margin-top:20px;">
+  <button onclick="exportJSON()">Datei speichern</button>
+  <input id="data-file-input" type="file" accept="application/json" onchange="importJSON(event)" style="display:none;">
+  <button onclick="document.getElementById('data-file-input').click()" style="margin-left:10px;">Datei laden</button>
+  <button onclick="clearAllData()" style="margin-left:10px;">Alle Daten löschen</button>
+  <button onclick="window.print()" style="margin-left:10px;">Drucken</button>
+</div>
+<div id="onscreen-totals" style="margin-top:20px;">
+  <h3>Monatsübersicht</h3>
+  <table>
+    <tr><th>Gesamtsumme</th><td id="grand-total"></td></tr>
+    <tr><th>Trinkgeld</th><td><input id="total-tip" oninput="checkInput(this); updateTotals()"></td></tr>
+    <tr><th>Summe inkl. Trinkgeld</th><td id="with-tip"></td></tr>
+    <tr><th>Netto</th><td id="net-total"></td></tr>
+    <tr><th>MwSt</th><td id="tax-total"></td></tr>
+  </table>
+</div>
+
+<div class="print-summary" style="display:none;">
+  <h3>Monatsübersicht (Druck)</h3>
+  <table>
+    <tr><th>Gesamtsumme</th><td id="grand-total-print"></td></tr>
+    <tr><th>Trinkgeld</th><td id="tip-print"></td></tr>
+    <tr><th>Summe inkl. Trinkgeld</th><td id="with-tip-print"></td></tr>
+    <tr><th>Netto</th><td id="net-total-print"></td></tr>
+    <tr><th>MwSt</th><td id="tax-total-print"></td></tr>
+  </table>
+</div>
+
+</div>
+
+<script>
+function copyPrintTotals(){
+ document.getElementById("grand-total-print").innerText = document.getElementById("grand-total").innerText;
+ document.getElementById("tip-print").innerText = document.getElementById("total-tip").value;
+ document.getElementById("with-tip-print").innerText = document.getElementById("with-tip").innerText;
+ document.getElementById("net-total-print").innerText = document.getElementById("net-total").innerText;
+ document.getElementById("tax-total-print").innerText = document.getElementById("tax-total").innerText;
+}
+window.onbeforeprint = copyPrintTotals;
+</script>
+
+</body>
+</html>
