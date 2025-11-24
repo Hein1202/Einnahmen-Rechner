@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Einnahmen V55</title>
+<title>Einnahmen V71</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -58,9 +58,7 @@ th, td { border:1px solid black; padding:6px; text-align:center; }
 }
 
 
-@media print {
-  .print-summary { page-break-before: always; display:block !important; }
-}
+
 
 
 .nav-btn {
@@ -532,10 +530,30 @@ function exportCSV(){
 }
 
 </script>
+
+<style>
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #reduced-print, #reduced-print * {
+    visibility: visible;
+  }
+  #reduced-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    font-family: monospace;
+    white-space: pre;
+    font-size: 12pt;
+  }
+}
+</style>
+
 </head>
 <body onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V55</h1>
+<h1>Einnahmen V71</h1>
 
 <div id="month-nav">
   <button class="nav-btn" onclick="prevMonth()">◄</button>
@@ -554,13 +572,31 @@ function exportCSV(){
     </tr>
   </thead>
   <tfoot></tfoot>
+
+
+
+<tr>
+  <!-- Beschriftung links und Gesamtzahl der Kunden in der letzten Spalte -->
+  <!-- Der Text "Gesamtanzahl Kunden:" wird bewusst etwas kleiner dargestellt, bleibt aber schwarz -->
+  <td colspan="4"
+      style="text-align: right;
+             font-weight: normal;
+             color: #000;
+             font-size: 0.8em;
+             font-style: italic;">
+    Gesamtanzahl Kunden:
+  </td>
+  <td id="grand-customers" style="font-weight: bold;">0</td>
+</tr>
 </table>
 <div style="margin-top:20px;">
+<button onclick="generateReducedPrint()" style="margin-left:10px;">🖨️ Reduzierter Druck</button>
+
   <button onclick="exportJSON()">Datei speichern</button>
   <input id="data-file-input" type="file" accept="application/json" onchange="importJSON(event)" style="display:none;">
   <button onclick="document.getElementById('data-file-input').click()" style="margin-left:10px;">Datei laden</button>
   <button onclick="clearAllData()" style="margin-left:10px;">Alle Daten löschen</button>
-  <button onclick="window.print()" style="margin-left:10px;">Drucken</button>
+  
 </div>
 <div id="onscreen-totals" style="margin-top:20px;">
   <h3>Monatsübersicht</h3>
@@ -586,15 +622,140 @@ function exportCSV(){
 
 </div>
 
+
+
+
+<div id="reduced-print" style="display:none;"></div>
+
+
+
+
+
+
+
+
+
+
+
+
+
 <script>
-function copyPrintTotals(){
- document.getElementById("grand-total-print").innerText = document.getElementById("grand-total").innerText;
- document.getElementById("tip-print").innerText = document.getElementById("total-tip").value;
- document.getElementById("with-tip-print").innerText = document.getElementById("with-tip").innerText;
- document.getElementById("net-total-print").innerText = document.getElementById("net-total").innerText;
- document.getElementById("tax-total-print").innerText = document.getElementById("tax-total").innerText;
+function generateReducedPrint() {
+  let output = "";
+  const month = document.getElementById("selected-month").innerText;
+  output += "Einnahmen " + month + "\n\n";
+
+  let total = 0;
+  let totalCustomers = 0;
+
+  for (let d = 1; d <= selDays; d++) {
+    const tbody = document.getElementById("day-" + d);
+    if (!tbody) continue;
+
+    const rows = tbody.querySelectorAll("tr.entry-row");
+    if (rows.length === 0) continue;
+
+    let tagSum = 0;
+    let kunden = 0;
+    let zeilen = [];
+
+    rows.forEach(r => {
+      const a1 = r.querySelector(".amount1")?.value || "";
+      const a2 = r.querySelector(".amount2")?.value || "";
+      let sum = 0;
+      if (a1) sum += parseFloat(a1.replace(",", "."));
+      if (a2) sum += parseFloat(a2.replace(",", "."));
+      if (sum > 0) {
+        kunden++;
+        if (a2) {
+          zeilen.push(`${a1},00`);
+          zeilen.push(`${a2},00`);
+        } else {
+          zeilen.push(`${a1},00`);
+        }
+        tagSum += sum;
+      }
+    });
+
+    if (tagSum > 0) {
+      const date = String(d).padStart(2, "0") + "." + String(selMonth + 1).padStart(2, "0") + "." + selYear;
+      const maxLines = Math.max(zeilen.length, 1);
+      for (let i = 0; i < maxLines; i++) {
+        const datum = i === 0 ? date.padEnd(12) : " ".repeat(12);
+        const einnahme = zeilen[i] ? zeilen[i].padStart(10) : "";
+        output += datum + einnahme + "\n";
+      }
+      output += " ".repeat(12) + "----------\n";
+      output += " ".repeat(12) + tagSum.toFixed(2).replace(".", ",").padStart(10) + "   |   " + kunden + " Kunden\n\n";
+
+      total += tagSum;
+      totalCustomers += kunden;
+    }
+  }
+
+  const tip = parseFloat(document.getElementById("total-tip")?.value.replace(",", ".") || "0");
+  const withTip = total + tip;
+  const netto = withTip / 1.19;
+  const mwst = withTip - netto;
+
+  const labelWidth = 24;
+
+  function line(label, value) {
+    return label.padEnd(labelWidth) + value.toFixed(2).replace(".", ",").padStart(10) + "\n\n";
+  }
+
+  output += "Monatsübersicht\n";
+  output += "----------------\n\n";
+  output += line("Gesamtsumme:", total);
+  output += line("Trinkgeld:", tip);
+  output += line("Summe inkl. Trinkgeld:", withTip);
+  output += line("Netto:", netto);
+  output += line("MwSt (19%):", mwst);
+      // Kundenanzahl zum Ausdruck hinzufügen: fügt die Summe aller Kundenzeilen an den Ausdruck an
+      output += "Gesamtanzahl Kunden:".padEnd(labelWidth)
+             + String(totalCustomers).padStart(10)
+             + "\n\n";
+
+
+  document.getElementById("reduced-print").innerText = output;
+  document.getElementById("reduced-print").style.display = "block";
+
+  setTimeout(() => {
+    window.print();
+    document.getElementById("reduced-print").style.display = "none";
+  }, 100);
 }
-window.onbeforeprint = copyPrintTotals;
+</script>
+
+
+
+
+
+
+
+
+<script>
+function updateCustomerTotal() {
+  let totalCustomers = 0;
+  const rows = document.querySelectorAll("tbody[id^='day-'] tr.entry-row");
+  rows.forEach(row => {
+    const amount1 = row.querySelector(".amount1")?.value || "";
+    const amount2 = row.querySelector(".amount2")?.value || "";
+    let sum = 0;
+    if (amount1) sum += parseFloat(amount1.replace(",", "."));
+    if (amount2) sum += parseFloat(amount2.replace(",", "."));
+    if (sum > 0) totalCustomers++;
+  });
+  const target = document.getElementById("grand-customers");
+  if (target) target.textContent = totalCustomers;
+}
+
+document.addEventListener("DOMContentLoaded", updateCustomerTotal);
+document.addEventListener("input", function(e) {
+  if (e.target.classList.contains("amount1") || e.target.classList.contains("amount2")) {
+    updateCustomerTotal();
+  }
+});
 </script>
 
 </body>
