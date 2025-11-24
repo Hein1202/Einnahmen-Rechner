@@ -532,12 +532,23 @@ function exportCSV(){
 </script>
 
 <style>
+/*
+ * Im Druckmodus wird nur der Bereich "#reduced-print" ausgegeben. Auf einigen
+ * Mobilgeräten kann "visibility: hidden" dazu führen, dass leere Seiten
+ * entstehen, da der verborgene Inhalt weiterhin Platz reserviert. Daher
+ * verwenden wir "display: none" für alle Elemente außer dem Ausdrucksbereich
+ * und blenden diesen explizit über "display: block" ein. Zusätzlich sorgen
+ * wir für eine klare Formatierung (monospace‑Schrift) und setzen Farbe und
+ * Hintergrund, damit die PDF‑Darstellung auf Smartphones korrekt ist.
+ */
 @media print {
+  /* Alle Elemente standardmäßig ausblenden */
   body * {
-    visibility: hidden;
+    display: none !important;
   }
+  /* Den Ausdrucksbereich und seine Kinder sichtbar machen */
   #reduced-print, #reduced-print * {
-    visibility: visible;
+    display: block !important;
   }
   #reduced-print {
     position: absolute;
@@ -546,6 +557,8 @@ function exportCSV(){
     font-family: monospace;
     white-space: pre;
     font-size: 12pt;
+    color: black !important;
+    background: white !important;
   }
 }
 </style>
@@ -640,6 +653,12 @@ function exportCSV(){
 
 
 <script>
+/**
+ * Erzeugt einen einfachen Ausdruck der Tages- und Monatsübersicht.
+ * Diese Funktion sammelt alle Einträge, summiert sie, erzeugt eine
+ * textbasierte Tabelle und öffnet den Browser-Druckdialog. Es wird
+ * außerdem die Gesamtanzahl aller Kunden am Monatsende ausgegeben.
+ */
 function generateReducedPrint() {
   let output = "";
   const month = document.getElementById("selected-month").innerText;
@@ -678,6 +697,7 @@ function generateReducedPrint() {
     });
 
     if (tagSum > 0) {
+      // Datum im Format TT.MM.JJJJ
       const date = String(d).padStart(2, "0") + "." + String(selMonth + 1).padStart(2, "0") + "." + selYear;
       const maxLines = Math.max(zeilen.length, 1);
       for (let i = 0; i < maxLines; i++) {
@@ -693,17 +713,19 @@ function generateReducedPrint() {
     }
   }
 
+  // Trinkgeld, Netto, MwSt berechnen
   const tip = parseFloat(document.getElementById("total-tip")?.value.replace(",", ".") || "0");
   const withTip = total + tip;
   const netto = withTip / 1.19;
   const mwst = withTip - netto;
 
   const labelWidth = 24;
-
+  // Helferfunktion für eine Zeile der Monatsübersicht
   function line(label, value) {
     return label.padEnd(labelWidth) + value.toFixed(2).replace(".", ",").padStart(10) + "\n\n";
   }
 
+  // Monatsübersicht
   output += "Monatsübersicht\n";
   output += "----------------\n\n";
   output += line("Gesamtsumme:", total);
@@ -711,18 +733,17 @@ function generateReducedPrint() {
   output += line("Summe inkl. Trinkgeld:", withTip);
   output += line("Netto:", netto);
   output += line("MwSt (19%):", mwst);
-      // Kundenanzahl zum Ausdruck hinzufügen: fügt die Summe aller Kundenzeilen an den Ausdruck an
-      output += "Gesamtanzahl Kunden:".padEnd(labelWidth)
-             + String(totalCustomers).padStart(10)
-             + "\n\n";
+  // Gesamtanzahl der Kunden anhängen
+  output += "Gesamtanzahl Kunden:".padEnd(labelWidth) + String(totalCustomers).padStart(10) + "\n\n";
 
-
-  document.getElementById("reduced-print").innerText = output;
-  document.getElementById("reduced-print").style.display = "block";
-
+  // Text in das versteckte Druckdiv schreiben und anzeigen
+  const rp = document.getElementById("reduced-print");
+  rp.innerText = output;
+  rp.style.display = "block";
+  // kurze Verzögerung, damit das DOM aktualisiert wird
   setTimeout(() => {
     window.print();
-    document.getElementById("reduced-print").style.display = "none";
+    rp.style.display = "none";
   }, 100);
 }
 </script>
