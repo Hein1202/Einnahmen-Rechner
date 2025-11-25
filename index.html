@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Einnahmen V79</title>
+<title>Einnahmen V80</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -265,15 +265,35 @@ function handleEnter(e){
   }
 }
 
-// Eigene freie Tage speichern / lesen
+// Eigene freie Tage speichern / lesen. Bei einem Klick kann der Benutzer wählen,
+// ob der Tag als Urlaubstag oder Krankheitstag markiert werden soll. Bei erneutem
+// Klick wird die Markierung entfernt. Die Auswahl wird unter dem Schlüssel
+// "cf-YYYY-MM-DD" im localStorage gespeichert und der Wert gibt die Art des
+// freien Tages an ("urlaub" oder "krank").
 function toggleFreeDay(day){
   const key = "cf-" + selYear + "-" + selMonth + "-" + day;
-  if(localStorage.getItem(key)) localStorage.removeItem(key);
-  else localStorage.setItem(key, "1");
+  const existing = localStorage.getItem(key);
+  if (existing) {
+    // vorhandene Markierung entfernen
+    localStorage.removeItem(key);
+  } else {
+    // den Benutzer nach der Art fragen: OK=Urlaubstag, Abbrechen=Krankheitstag
+    const isUrlaub = confirm("Urlaubstag festlegen?\n(Abbrechen = Krankheitstag)");
+    const value = isUrlaub ? "urlaub" : "krank";
+    localStorage.setItem(key, value);
+  }
   updateMonth();  // neu aufbauen
 }
+
+// Liefert den Typ des eigenen freien Tages ("urlaub", "krank") oder null, wenn
+// der Tag kein eigener freier Tag ist.
+function getFreeDayType(day){
+  return localStorage.getItem("cf-" + selYear + "-" + selMonth + "-" + day);
+}
+
+// Prüft, ob der Tag als eigener freier Tag markiert ist (unabhängig vom Typ).
 function isFreeDay(day){
-  return localStorage.getItem("cf-" + selYear + "-" + selMonth + "-" + day) !== null;
+  return getFreeDayType(day) !== null;
 }
 
 // Monatsnavigation
@@ -312,7 +332,9 @@ function buildTable(){
     const ds = fmt(date);
     const isHoliday = (holidays[ds] != null);
     const isWeekend = (weekday === "samstag" || weekday === "sonntag");
-    const isFree = isFreeDay(day);
+    // Den Typ des eigenen freien Tages ermitteln ("urlaub", "krank" oder null)
+    const freeType = getFreeDayType(day);
+    const isFree = freeType !== null;
 
     let tb = document.createElement("tbody");
     tb.classList.add("dayblock");
@@ -343,8 +365,10 @@ function buildTable(){
         </tr>
         `;
     } else if(isFree){
+      // Je nach Typ des eigenen freien Tages eine passende Beschriftung wählen
+      const label = freeType === "urlaub" ? "Urlaubstag" : (freeType === "krank" ? "Krankheitstag" : "Eigener freier Tag");
       tb.innerHTML = `<tr class="customfree">
-        <td class="day-cell" onclick="toggleFreeDay(${day})">${day}<br><small>Eigener freier Tag</small></td>
+        <td class="day-cell" onclick="toggleFreeDay(${day})">${day}<br><small>${label}</small></td>
         <td colspan="4">Kein Arbeitstag</td>
       </tr>
         <tr class="day-summary">
@@ -634,7 +658,7 @@ function exportCSV(){
 </head>
 <body onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V79</h1>
+<h1>Einnahmen V80</h1>
 
 <div id="month-nav">
   <button class="nav-btn" onclick="prevMonth()">◄</button>
@@ -745,7 +769,27 @@ function generateReducedPrint() {
     if (!tbody) continue;
 
     const rows = tbody.querySelectorAll("tr.entry-row");
-    if (rows.length === 0) continue;
+    // Falls es keine Eintragszeilen gibt, prüfen ob der Tag als Urlaub oder Krankheit markiert ist.
+    if (rows.length === 0) {
+      // Typ des eigenen freien Tages aus dem localStorage abrufen, sofern Funktion verfügbar.
+      let freeType = null;
+      try {
+        if (typeof getFreeDayType === 'function') {
+          freeType = getFreeDayType(d);
+        }
+      } catch (e) {
+        freeType = null;
+      }
+      // Wenn der Tag als frei markiert ist, Grund in den Ausdruck aufnehmen.
+      if (freeType) {
+        // Datum im Format TT.MM.JJJJ
+        const date = String(d).padStart(2, "0") + "." + String(selMonth + 1).padStart(2, "0") + "." + selYear;
+        // Menschlich lesbare Beschriftung abhängig vom Typ
+        const label = freeType === "urlaub" ? "Urlaubstag" : (freeType === "krank" ? "Krankheitstag" : "Eigener freier Tag");
+        output += date.padEnd(12) + label + "\n\n";
+      }
+      continue;
+    }
 
     let tagSum = 0;
     let kunden = 0;
