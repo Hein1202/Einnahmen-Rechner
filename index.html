@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Einnahmen V74</title>
+<title>Einnahmen V75</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -566,7 +566,7 @@ function exportCSV(){
 </head>
 <body onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V74</h1>
+<h1>Einnahmen V75</h1>
 
 <div id="month-nav">
   <button class="nav-btn" onclick="prevMonth()">◄</button>
@@ -679,25 +679,29 @@ function generateReducedPrint() {
     let zeilen = [];
 
     rows.forEach(r => {
-      // Betragswerte als Strings auslesen
+      // Betragswerte als Strings auslesen und in Zahlen konvertieren
       const a1Str = r.querySelector(".amount1")?.value || "";
       const a2Str = r.querySelector(".amount2")?.value || "";
-      let sum = 0;
-      // Hilfsfunktion zum Parsen und Formattieren eines Betrags.
-      const addLine = (str) => {
-        const num = parseFloat(String(str).replace(",", "."));
-        if (!isNaN(num)) {
-          // Betrag mit zwei Nachkommastellen und deutschem Dezimaltrennzeichen ausgeben
-          zeilen.push(num.toFixed(2).replace(".", ","));
-        }
-      };
-      if (a1Str) sum += parseFloat(String(a1Str).replace(",", "."));
-      if (a2Str) sum += parseFloat(String(a2Str).replace(",", "."));
-      if (sum > 0) {
+      const num1 = parseFloat(String(a1Str).replace(",", "."));
+      const num2 = parseFloat(String(a2Str).replace(",", "."));
+      const sumVal = (isNaN(num1) ? 0 : num1) + (isNaN(num2) ? 0 : num2);
+      if (sumVal > 0) {
         kunden++;
-        addLine(a1Str);
-        if (a2Str) addLine(a2Str);
-        tagSum += sum;
+        // Formatierfunktion für zwei Dezimalstellen mit deutschem Dezimaltrennzeichen
+        const fmt = n => n.toFixed(2).replace(".", ",");
+        const formattedSum = fmt(sumVal);
+        // formatierte Einzelbeträge
+        const fmt1 = !isNaN(num1) ? fmt(num1) : "";
+        const fmt2 = !isNaN(num2) && num2 > 0 ? fmt(num2) : "";
+        let line;
+        if (a2Str && fmt2) {
+          // Gesamtbetrag plus Einzelbeträge rechts daneben
+          line = formattedSum.padStart(10) + "   " + fmt1 + " + " + fmt2;
+        } else {
+          line = fmt1.padStart(10);
+        }
+        zeilen.push(line);
+        tagSum += sumVal;
       }
     });
 
@@ -707,7 +711,8 @@ function generateReducedPrint() {
       const maxLines = Math.max(zeilen.length, 1);
       for (let i = 0; i < maxLines; i++) {
         const datum = i === 0 ? date.padEnd(12) : " ".repeat(12);
-        const einnahme = zeilen[i] ? zeilen[i].padStart(10) : "";
+        // Zeile enthält bereits gepaddeten Gesamtbetrag und ggf. separate Beträge rechts davon.
+        const einnahme = zeilen[i] || "";
         output += datum + einnahme + "\n";
       }
       output += " ".repeat(12) + "----------\n";
