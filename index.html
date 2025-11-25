@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Einnahmen V78</title>
+<title>Einnahmen V79</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -33,7 +33,11 @@ th, td { border:1px solid black; padding:6px; text-align:center; }
 
 /* Breite der Eingabe für Betrag 1 reduzieren und zentrieren */
 .amount1 {
-  width: 90%;
+  /* Verringern Sie die Breite des ersten Betragsfeldes, sodass es schmaler wirkt. */
+  /* 60 % der Zellenbreite ist in Kombination mit einer maximalen Breite von 120 px kompakt,  
+     sodass längere Texte dennoch sichtbar bleiben. */
+  width: 60%;
+  max-width: 120px;
   display: block;
   margin: 0 auto;
 }
@@ -630,7 +634,7 @@ function exportCSV(){
 </head>
 <body onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V78</h1>
+<h1>Einnahmen V79</h1>
 
 <div id="month-nav">
   <button class="nav-btn" onclick="prevMonth()">◄</button>
@@ -684,6 +688,11 @@ function exportCSV(){
     <tr><th>Netto</th><td id="net-total"></td></tr>
     <tr><th>MwSt</th><td id="tax-total"></td></tr>
   </table>
+</div>
+
+<div style="margin-top: 10px; text-align: right;">
+  <!-- Button zum Zurückscrollen zum letzten Eintrag -->
+  <button onclick="scrollBackToLastEntry()">↑ Zurück zum letzten Eintrag</button>
 </div>
 
 <div class="print-summary" style="display:none;">
@@ -910,6 +919,22 @@ function scrollToTotals() {
   const totals = document.getElementById("onscreen-totals");
   if (totals) {
     totals.scrollIntoView({ behavior: "smooth" });
+  }
+}
+
+// Scrollt zur zuletzt bearbeiteten Eintragszeile (falls vorhanden)
+function scrollBackToLastEntry() {
+  // Verwende die globale Referenz auf die letzte bearbeitete Eintragszeile,
+  // um zu dieser zu scrollen. Wir berechnen eine Zielposition, damit die
+  // Zeile möglichst mittig im sichtbaren Bereich steht.
+  if (typeof currentScrollRow !== 'undefined' && currentScrollRow) {
+    const rect = currentScrollRow.getBoundingClientRect();
+    const rowTop = rect.top + window.pageYOffset;
+    // Zielposition so berechnen, dass sie nicht kleiner als 0 ist. Wird der Wert
+    // negativ, führt scrollTo sonst nur an den Seitenanfang und nicht mittig.
+    let target = rowTop - (window.innerHeight / 2) + (rect.height / 2);
+    if (target < 0) target = 0;
+    window.scrollTo({ top: target, behavior: 'smooth' });
   }
 }
 </script>
