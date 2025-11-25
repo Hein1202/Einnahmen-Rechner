@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Einnahmen V75</title>
+<title>Einnahmen V77</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -23,12 +23,30 @@ h1 { margin-top:0; }
 table { width:100%; border-collapse:collapse; background:#f5f5dc; }
 th, td { border:1px solid black; padding:6px; text-align:center; }
 
+/* Grundlegendes Styling für Betragsfelder und Trinkgeld */
 .amount1, .amount2, #total-tip {
-  width:100%;
   box-sizing:border-box;
   padding:8px;
   border:1px solid black;
   text-align:center;
+}
+
+/* Breite der Eingabe für Betrag 1 reduzieren und zentrieren */
+.amount1 {
+  width: 90%;
+  display: block;
+  margin: 0 auto;
+}
+
+/* Zweites Betragsfeld weiterhin volle Breite innerhalb seiner Zelle */
+.amount2 {
+  width: 100%;
+  min-width: 60px;
+}
+
+/* Mindesbreite für das zweite Betragsfeld, damit Werte vollständig sichtbar sind */
+.amount2 {
+  min-width: 60px;
 }
 .empty-input { background-color:lightgray; }
 .amount1:not(.empty-input),
@@ -80,6 +98,43 @@ th, td { border:1px solid black; padding:6px; text-align:center; }
   font-size: 0.8em;
   padding: 2px 6px;
   cursor: pointer;
+}
+
+/* Scroll button to jump from a day to the monthly overview */
+/* Base cell style: empty by default */
+.scroll-to-summary {
+  width: 28px;
+  height: 28px;
+  text-align: center;
+  vertical-align: middle;
+  cursor: pointer;
+  padding: 0;
+  font-size: 1em;
+}
+
+/* Active state: show a circular button around the arrow */
+.scroll-to-summary.active {
+  border: 2px solid #444;
+  border-radius: 50%;
+  background: #f0f0f0;
+  font-size: 1.2em;
+  line-height: 24px;
+  font-weight: bold;
+}
+
+/* Highlight on hover */
+.scroll-to-summary.active:hover {
+  background: #d8eaff;
+}
+
+/* Entferne Auf-/Ab-Pfeile (Spinner) in number-Feldern, um den Inhalt komplett anzuzeigen */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield; /* für Firefox */
 }
 
 </style>
@@ -265,7 +320,8 @@ function buildTable(){
         <td colspan="4">Kein Arbeitstag</td>
       </tr>
         <tr class="day-summary">
-          <td></td><td></td><td></td>
+          <td></td><td></td>
+          <td></td>
           <td id="sum-${day}">0.00</td>
           <td id="cnt-${day}">0</td>
         </tr>
@@ -276,7 +332,8 @@ function buildTable(){
         <td colspan="4">Kein Arbeitstag</td>
       </tr>
         <tr class="day-summary">
-          <td></td><td></td><td></td>
+          <td></td><td></td>
+          <td></td>
           <td id="sum-${day}">0.00</td>
           <td id="cnt-${day}">0</td>
         </tr>
@@ -287,7 +344,8 @@ function buildTable(){
         <td colspan="4">Kein Arbeitstag</td>
       </tr>
         <tr class="day-summary">
-          <td></td><td></td><td></td>
+          <td></td><td></td>
+          <td></td>
           <td id="sum-${day}">0.00</td>
           <td id="cnt-${day}">0</td>
         </tr>
@@ -304,11 +362,12 @@ function buildTable(){
             </div>
             <button type="button" class="toggle-amount2" onclick="toggleAmount2(this, ${day})">+ Betrag 2</button>
           </td>
-          <td></td>
+          <td class="scroll-to-summary" onclick="scrollToTotals()"></td>
           <td></td>
         </tr>
         <tr class="day-summary">
-          <td></td><td></td><td></td>
+          <td></td><td></td>
+          <td class="scroll-to-summary" onclick="scrollToTotals()"></td>
           <td id="sum-${day}">0.00</td>
           <td id="cnt-${day}">0</td>
         </tr>
@@ -331,13 +390,18 @@ function addRow(day){
       </div>
       <button type="button" class="toggle-amount2" onclick="toggleAmount2(this, ${day})">+ Betrag 2</button>
     </td>
-    <td></td>
+    <td class="scroll-to-summary" onclick="scrollToTotals()"></td>
     <td></td>`;
   const summary = tb.querySelector("tr.day-summary");
   if(summary){
     tb.insertBefore(tr, summary);
   } else {
     tb.appendChild(tr);
+  }
+
+  // Move the scroll indicator to the newly added row
+  if (typeof updateScrollArrow === 'function') {
+    updateScrollArrow(tr);
   }
 }
 
@@ -566,7 +630,7 @@ function exportCSV(){
 </head>
 <body onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V75</h1>
+<h1>Einnahmen V77</h1>
 
 <div id="month-nav">
   <button class="nav-btn" onclick="prevMonth()">◄</button>
@@ -787,6 +851,67 @@ document.addEventListener("input", function(e) {
     updateCustomerTotal();
   }
 });
+
+// Delegate click events for scroll-to-summary elements to smoothly scroll to the monthly totals
+document.addEventListener('click', function(event) {
+  const target = event.target;
+  if (target && target.classList.contains('scroll-to-summary')) {
+    // Prevent default anchor behaviour and scroll smoothly to the monthly overview
+    event.preventDefault();
+    const totals = document.getElementById('onscreen-totals');
+    if (totals) {
+      totals.scrollIntoView({ behavior: 'smooth' });
+    }
+  }
+});
+
+// Keep track of which entry row currently holds the scroll indicator
+let currentScrollRow = null;
+
+/**
+ * Move the arrow indicator to the given entry row. The indicator is shown by
+ * inserting a downward arrow character into the row's scroll-to-summary cell and
+ * clearing it from any previous row. This ensures only one arrow is visible at
+ * a time.
+ * @param {HTMLElement} row The table row (tr.entry-row) to highlight.
+ */
+function updateScrollArrow(row) {
+  // Remove arrow from previous row
+  if (currentScrollRow && currentScrollRow !== row) {
+    const prevCell = currentScrollRow.querySelector('.scroll-to-summary');
+    if (prevCell) {
+      prevCell.textContent = '';
+      prevCell.classList.remove('active');
+      prevCell.removeAttribute('title');
+    }
+  }
+  currentScrollRow = row;
+  // Set arrow on current row
+  if (row) {
+    const cell = row.querySelector('.scroll-to-summary');
+    if (cell) {
+      cell.textContent = '↓';
+      cell.classList.add('active');
+      cell.setAttribute('title', 'Zur Monatsübersicht scrollen');
+    }
+  }
+}
+
+// When an amount field gains focus, move the arrow to its row
+document.addEventListener('focusin', function(e) {
+  if (e.target && (e.target.classList.contains('amount1') || e.target.classList.contains('amount2'))) {
+    const row = e.target.closest('tr.entry-row');
+    if (row) updateScrollArrow(row);
+  }
+});
+
+// Scroll to the monthly summary when the user clicks the scroll button
+function scrollToTotals() {
+  const totals = document.getElementById("onscreen-totals");
+  if (totals) {
+    totals.scrollIntoView({ behavior: "smooth" });
+  }
+}
 </script>
 
 </body>
