@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Einnahmen V80</title>
+<title>Einnahmen V81</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -367,9 +367,10 @@ function buildTable(){
     } else if(isFree){
       // Je nach Typ des eigenen freien Tages eine passende Beschriftung wählen
       const label = freeType === "urlaub" ? "Urlaubstag" : (freeType === "krank" ? "Krankheitstag" : "Eigener freier Tag");
+      // Bei eigenen freien Tagen soll die Beschriftung "Kein Arbeitstag" entfallen.
       tb.innerHTML = `<tr class="customfree">
         <td class="day-cell" onclick="toggleFreeDay(${day})">${day}<br><small>${label}</small></td>
-        <td colspan="4">Kein Arbeitstag</td>
+        <td colspan="4"></td>
       </tr>
         <tr class="day-summary">
           <td></td><td></td>
@@ -658,7 +659,7 @@ function exportCSV(){
 </head>
 <body onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V80</h1>
+<h1>Einnahmen V81</h1>
 
 <div id="month-nav">
   <button class="nav-btn" onclick="prevMonth()">◄</button>
