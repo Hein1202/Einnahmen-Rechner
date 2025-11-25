@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Einnahmen V73</title>
+<title>Einnahmen V74</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -297,10 +297,10 @@ function buildTable(){
         <tr><td colspan="5"><button onclick="addRow(${day})">Neue Zeile für ${day}</button></td></tr>
         <tr class="entry-row">
           <td class="day-cell" onclick="toggleFreeDay(${day})">${day}</td>
-          <td><input class="amount1 empty-input" type="number" oninput="checkInput(this); updateDay(${day})" onkeydown="handleEnter(event)"></td>
+          <td><input class="amount1 empty-input" type="number" step="0.01" lang="de" oninput="checkInput(this); updateDay(${day})" onkeydown="handleEnter(event)"></td>
           <td>
             <div class="amount2-wrapper" style="display:none;">
-              <input class="amount2 empty-input" type="number" oninput="checkInput(this); updateDay(${day})" onkeydown="handleEnter(event)">
+              <input class="amount2 empty-input" type="number" step="0.01" lang="de" oninput="checkInput(this); updateDay(${day})" onkeydown="handleEnter(event)">
             </div>
             <button type="button" class="toggle-amount2" onclick="toggleAmount2(this, ${day})">+ Betrag 2</button>
           </td>
@@ -324,10 +324,10 @@ function addRow(day){
   tr.classList.add("entry-row");
   tr.innerHTML = `
     <td></td>
-    <td><input class="amount1 empty-input" type="number" oninput="checkInput(this); updateDay(${day})" onkeydown="handleEnter(event)"></td>
+    <td><input class="amount1 empty-input" type="number" step="0.01" lang="de" oninput="checkInput(this); updateDay(${day})" onkeydown="handleEnter(event)"></td>
     <td>
       <div class="amount2-wrapper" style="display:none;">
-        <input class="amount2 empty-input" type="number" oninput="checkInput(this); updateDay(${day})" onkeydown="handleEnter(event)">
+        <input class="amount2 empty-input" type="number" step="0.01" lang="de" oninput="checkInput(this); updateDay(${day})" onkeydown="handleEnter(event)">
       </div>
       <button type="button" class="toggle-amount2" onclick="toggleAmount2(this, ${day})">+ Betrag 2</button>
     </td>
@@ -566,7 +566,7 @@ function exportCSV(){
 </head>
 <body onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V73</h1>
+<h1>Einnahmen V74</h1>
 
 <div id="month-nav">
   <button class="nav-btn" onclick="prevMonth()">◄</button>
@@ -679,19 +679,24 @@ function generateReducedPrint() {
     let zeilen = [];
 
     rows.forEach(r => {
-      const a1 = r.querySelector(".amount1")?.value || "";
-      const a2 = r.querySelector(".amount2")?.value || "";
+      // Betragswerte als Strings auslesen
+      const a1Str = r.querySelector(".amount1")?.value || "";
+      const a2Str = r.querySelector(".amount2")?.value || "";
       let sum = 0;
-      if (a1) sum += parseFloat(a1.replace(",", "."));
-      if (a2) sum += parseFloat(a2.replace(",", "."));
+      // Hilfsfunktion zum Parsen und Formattieren eines Betrags.
+      const addLine = (str) => {
+        const num = parseFloat(String(str).replace(",", "."));
+        if (!isNaN(num)) {
+          // Betrag mit zwei Nachkommastellen und deutschem Dezimaltrennzeichen ausgeben
+          zeilen.push(num.toFixed(2).replace(".", ","));
+        }
+      };
+      if (a1Str) sum += parseFloat(String(a1Str).replace(",", "."));
+      if (a2Str) sum += parseFloat(String(a2Str).replace(",", "."));
       if (sum > 0) {
         kunden++;
-        if (a2) {
-          zeilen.push(`${a1},00`);
-          zeilen.push(`${a2},00`);
-        } else {
-          zeilen.push(`${a1},00`);
-        }
+        addLine(a1Str);
+        if (a2Str) addLine(a2Str);
         tagSum += sum;
       }
     });
