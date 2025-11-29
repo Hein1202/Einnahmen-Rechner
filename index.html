@@ -1,8 +1,9 @@
 <!DOCTYPE html>
+
 <html lang="de">
 <head>
-<meta charset="UTF-8">
-<title>Einnahmen V81</title>
+<meta charset="utf-8"/>
+<title>Einnahmen V84</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -141,6 +142,13 @@ input[type="number"] {
   -moz-appearance: textfield; /* für Firefox */
 }
 
+
+.bg-blue   { background-color: #e0f0ff; }
+.bg-green  { background-color: #e8ffe8; }
+.bg-yellow { background-color: #fffbe0; }
+.bg-dark   { background-color: #1e1e1e; color: white; }
+
+.bg-darkblue { background-color: #b0c4de; } /* steelblue/light slate blue */
 </style>
 <script>
 // --- Globale Variablen ---
@@ -623,7 +631,6 @@ function exportCSV(){
 }
 
 </script>
-
 <style>
 /*
  * Im Druckmodus wird nur der Bereich "#reduced-print" ausgegeben. Auf einigen
@@ -655,101 +662,73 @@ function exportCSV(){
   }
 }
 </style>
-
 </head>
-<body onload="updateMonth()">
+<body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V81</h1>
+<h1>Einnahmen V84</h1>
 
 <div id="month-nav">
-  <button class="nav-btn" onclick="prevMonth()">◄</button>
-  <span id="selected-month"></span>
-  <button class="nav-btn" onclick="nextMonth()">►</button>
+<button class="nav-btn" onclick="prevMonth()">◄</button>
+<span id="selected-month"></span>
+<button class="nav-btn" onclick="nextMonth()">►</button>
 </div>
-
 <table id="main-table">
-  <thead>
-    <tr>
-      <th>Tag</th>
-      <th>Betrag 1</th>
-      <th>Betrag 2</th>
-      <th>Summe</th>
-      <th>Kunden</th>
-    </tr>
-  </thead>
-  <tfoot></tfoot>
-
-
-
+<thead>
 <tr>
-  <!-- Beschriftung links und Gesamtzahl der Kunden in der letzten Spalte -->
-  <!-- Der Text "Gesamtanzahl Kunden:" wird bewusst etwas kleiner dargestellt, bleibt aber schwarz -->
-  <td colspan="4"
-      style="text-align: right;
+<th>Tag</th>
+<th>Betrag 1</th>
+<th>Betrag 2</th>
+<th>Summe</th>
+<th>Kunden</th>
+</tr>
+</thead>
+<tfoot></tfoot>
+<tr>
+<!-- Beschriftung links und Gesamtzahl der Kunden in der letzten Spalte -->
+<!-- Der Text "Gesamtanzahl Kunden:" wird bewusst etwas kleiner dargestellt, bleibt aber schwarz -->
+<td colspan="4" style="text-align: right;
              font-weight: normal;
              color: #000;
              font-size: 0.8em;
              font-style: italic;">
     Gesamtanzahl Kunden:
   </td>
-  <td id="grand-customers" style="font-weight: bold;">0</td>
+<td id="grand-customers" style="font-weight: bold;">0</td>
 </tr>
 </table>
 <div style="margin-top:20px;">
 <button onclick="generateReducedPrint()" style="margin-left:10px;">🖨️ Reduzierter Druck</button>
-
-  <button onclick="exportJSON()">Datei speichern</button>
-  <input id="data-file-input" type="file" accept="application/json" onchange="importJSON(event)" style="display:none;">
-  <button onclick="document.getElementById('data-file-input').click()" style="margin-left:10px;">Datei laden</button>
-  <button onclick="clearAllData()" style="margin-left:10px;">Alle Daten löschen</button>
-  
+<button onclick="exportJSON()">Datei speichern</button>
+<input accept="application/json" id="data-file-input" onchange="importJSON(event)" style="display:none;" type="file"/>
+<button onclick="document.getElementById('data-file-input').click()" style="margin-left:10px;">Datei laden</button>
+<button onclick="clearAllData()" style="margin-left:10px;">Alle Daten löschen</button>
 </div>
 <div id="onscreen-totals" style="margin-top:20px;">
-  <h3>Monatsübersicht</h3>
-  <table>
-    <tr><th>Gesamtsumme</th><td id="grand-total"></td></tr>
-    <tr><th>Trinkgeld</th><td><input id="total-tip" oninput="checkInput(this); updateTotals()"></td></tr>
-    <tr><th>Summe inkl. Trinkgeld</th><td id="with-tip"></td></tr>
-    <tr><th>Netto</th><td id="net-total"></td></tr>
-    <tr><th>MwSt</th><td id="tax-total"></td></tr>
-  </table>
+<h3>Monatsübersicht</h3>
+<table>
+<tr><th>Gesamtsumme</th><td id="grand-total"></td></tr>
+<tr><th>Trinkgeld</th><td><input id="total-tip" oninput="checkInput(this); updateTotals()"/></td></tr>
+<tr><th>Summe inkl. Trinkgeld</th><td id="with-tip"></td></tr>
+<tr><th>Netto</th><td id="net-total"></td></tr>
+<tr><th>MwSt</th><td id="tax-total"></td></tr>
+</table>
 </div>
-
 <div style="margin-top: 10px; text-align: right;">
-  <!-- Button zum Zurückscrollen zum letzten Eintrag -->
-  <button onclick="scrollBackToLastEntry()">↑ Zurück zum letzten Eintrag</button>
+<!-- Button zum Zurückscrollen zum letzten Eintrag -->
+<button onclick="scrollBackToLastEntry()">↑ Zurück zum letzten Eintrag</button>
 </div>
-
 <div class="print-summary" style="display:none;">
-  <h3>Monatsübersicht (Druck)</h3>
-  <table>
-    <tr><th>Gesamtsumme</th><td id="grand-total-print"></td></tr>
-    <tr><th>Trinkgeld</th><td id="tip-print"></td></tr>
-    <tr><th>Summe inkl. Trinkgeld</th><td id="with-tip-print"></td></tr>
-    <tr><th>Netto</th><td id="net-total-print"></td></tr>
-    <tr><th>MwSt</th><td id="tax-total-print"></td></tr>
-  </table>
+<h3>Monatsübersicht (Druck)</h3>
+<table>
+<tr><th>Gesamtsumme</th><td id="grand-total-print"></td></tr>
+<tr><th>Trinkgeld</th><td id="tip-print"></td></tr>
+<tr><th>Summe inkl. Trinkgeld</th><td id="with-tip-print"></td></tr>
+<tr><th>Netto</th><td id="net-total-print"></td></tr>
+<tr><th>MwSt</th><td id="tax-total-print"></td></tr>
+</table>
 </div>
-
 </div>
-
-
-
-
 <div id="reduced-print" style="display:none;"></div>
-
-
-
-
-
-
-
-
-
-
-
-
-
 <script>
 /**
  * Erzeugt einen einfachen Ausdruck der Tages- und Monatsübersicht.
@@ -875,14 +854,6 @@ function generateReducedPrint() {
   }, 100);
 }
 </script>
-
-
-
-
-
-
-
-
 <script>
 function updateCustomerTotal() {
   let totalCustomers = 0;
