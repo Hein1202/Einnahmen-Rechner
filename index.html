@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V84</title>
+<title>Einnahmen V85</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -579,6 +579,11 @@ function importJSON(ev){
   reader.onload = e => {
     try{
       const data = JSON.parse(e.target.result);
+      if (data.year !== undefined && data.month !== undefined) {
+        selYear = data.year;
+        selMonth = data.month;
+        updateMonth();
+      }
       if(data.days){
         for(const key in data.days){
           localStorage.setItem(key, JSON.stringify(data.days[key]));
@@ -592,8 +597,9 @@ function importJSON(ev){
       if(data.totalTip !== undefined){
         localStorage.setItem("totalTip", data.totalTip);
       }
-      alert("Import erfolgreich. Seite wird neu geladen.");
-      location.reload();
+      alert("Import erfolgreich.");
+      loadAllDays();
+      updateTotals();
     }catch(err){
       alert("Fehler beim Import: " + err.message);
     }
@@ -662,11 +668,10 @@ function exportCSV(){
   }
 }
 </style>
-</head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V84</h1>
-
+<h1>Einnahmen V85</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span>
@@ -702,7 +707,7 @@ function exportCSV(){
 <input accept="application/json" id="data-file-input" onchange="importJSON(event)" style="display:none;" type="file"/>
 <button onclick="document.getElementById('data-file-input').click()" style="margin-left:10px;">Datei laden</button>
 <button onclick="clearAllData()" style="margin-left:10px;">Alle Daten löschen</button>
-</div>
+<button onclick="exportExcel()" style="margin-left:10px;">📊 Excel speichern</button></div>
 <div id="onscreen-totals" style="margin-top:20px;">
 <h3>Monatsübersicht</h3>
 <table>
@@ -954,6 +959,82 @@ function scrollBackToLastEntry() {
   }
 }
 </script>
+<script>
+function exportExcel() {
+  const wb = XLSX.utils.book_new();
+  const ws_data = [];
 
+  let total = 0;
+  let totalCustomers = 0;
+
+  for (let d = 1; d <= selDays; d++) {
+    const rows = document.querySelectorAll("#day-" + d + " .entry-row");
+    const dateStr = String(d).padStart(2, "0") + "." + String(selMonth + 1).padStart(2, "0") + "." + selYear;
+
+    let dayLines = [];
+    let tagSum = 0;
+    let kunden = 0;
+
+    rows.forEach(r => {
+      const a1Str = r.querySelector(".amount1")?.value || "";
+      const a2Str = r.querySelector(".amount2")?.value || "";
+
+      const num1 = parseFloat(a1Str.replace(",", "."));
+      const num2 = parseFloat(a2Str.replace(",", "."));
+      const sumVal = (isNaN(num1) ? 0 : num1) + (isNaN(num2) ? 0 : num2);
+
+      if (sumVal > 0) {
+        kunden++;
+        const fmt = n => n.toFixed(2).replace(".", ",");
+        const formattedSum = fmt(sumVal);
+        const fmt1 = !isNaN(num1) ? fmt(num1) : "";
+        const fmt2 = !isNaN(num2) && num2 > 0 ? fmt(num2) : "";
+
+        if (a2Str && fmt2) {
+          dayLines.push(["", formattedSum, `${fmt1} + ${fmt2}`]);
+        } else {
+          dayLines.push(["", fmt1, ""]);
+        }
+
+        tagSum += sumVal;
+      }
+    });
+
+    if (tagSum > 0) {
+      ws_data.push([dateStr]); // Datum als Überschrift
+      dayLines.forEach(l => ws_data.push(l));
+      ws_data.push(["", "----------"]);
+      ws_data.push(["", tagSum.toFixed(2).replace(".", ","), `|   ${kunden} Kunden`]);
+      ws_data.push([]); // Leere Zeile
+      total += tagSum;
+      totalCustomers += kunden;
+    }
+  }
+
+  // Monatsübersicht mit Trinkgeld, Netto, MwSt
+  const tip = parseFloat(document.getElementById("total-tip")?.value.replace(",", ".") || "0");
+  const withTip = total + tip;
+  const netto = withTip / 1.19;
+  const mwst = withTip - netto;
+
+  const fmt = n => n.toFixed(2).replace(".", ",");
+
+  ws_data.push([]);
+  ws_data.push(["Monatsübersicht"]);
+  ws_data.push(["----------------"]);
+  ws_data.push(["Gesamtsumme:", fmt(total)]);
+  ws_data.push(["Trinkgeld:", fmt(tip)]);
+  ws_data.push(["Summe inkl. Trinkgeld:", fmt(withTip)]);
+  ws_data.push(["Netto:", fmt(netto)]);
+  ws_data.push(["MwSt (19%):", fmt(mwst)]);
+  ws_data.push(["Gesamtanzahl Kunden:", totalCustomers]);
+
+  const ws = XLSX.utils.aoa_to_sheet(ws_data);
+  XLSX.utils.book_append_sheet(wb, ws, "Einnahmen");
+
+  const filename = `Einnahmen_${selYear}-${String(selMonth+1).padStart(2,"0")}.xlsx`;
+  XLSX.writeFile(wb, filename);
+}
+</script>
 </body>
 </html>
