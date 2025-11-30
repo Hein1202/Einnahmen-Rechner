@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V85</title>
+<title>Einnahmen V87</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -579,11 +579,6 @@ function importJSON(ev){
   reader.onload = e => {
     try{
       const data = JSON.parse(e.target.result);
-      if (data.year !== undefined && data.month !== undefined) {
-        selYear = data.year;
-        selMonth = data.month;
-        updateMonth();
-      }
       if(data.days){
         for(const key in data.days){
           localStorage.setItem(key, JSON.stringify(data.days[key]));
@@ -597,9 +592,8 @@ function importJSON(ev){
       if(data.totalTip !== undefined){
         localStorage.setItem("totalTip", data.totalTip);
       }
-      alert("Import erfolgreich.");
-      loadAllDays();
-      updateTotals();
+      alert("Import erfolgreich. Seite wird neu geladen.");
+      location.reload();
     }catch(err){
       alert("Fehler beim Import: " + err.message);
     }
@@ -671,7 +665,7 @@ function exportCSV(){
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V85</h1>
+<h1>Einnahmen V87</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span>
@@ -959,6 +953,8 @@ function scrollBackToLastEntry() {
   }
 }
 </script>
+
+
 <script>
 function exportExcel() {
   const wb = XLSX.utils.book_new();
