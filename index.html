@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V87</title>
+<title>Einnahmen V89</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -149,6 +149,55 @@ input[type="number"] {
 .bg-dark   { background-color: #1e1e1e; color: white; }
 
 .bg-darkblue { background-color: #b0c4de; } /* steelblue/light slate blue */
+
+/* Äußerer Rahmen pro Tag */
+tbody[id^="day-"] {
+  border: 2px solid #333;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+/* Keine Rahmen innerhalb eines Tagesblocks */
+tbody[id^="day-"] td,
+tbody[id^="day-"] tr {
+  border: none !important;
+  outline: none !important;
+}
+
+/* Inputs bleiben sichtbar, aber dezent */
+tbody[id^="day-"] input {
+  border: 1px solid #ccc;
+}
+
+
+/* Größere Darstellung der Tageszahlen (erste Spalte) */
+tbody[id^="day-"] tr:first-child td:first-child {
+  font-size: 1.4em;
+  font-weight: bold;
+}
+
+
+/* Auch Tageszahlen in freien Tagen (z. B. Samstag, Sonntag, Feiertag) größer darstellen */
+tr.frei td span.fett {
+  font-size: 1.4em;
+}
+
+
+/* Auch reguläre Tageszahlen größer darstellen */
+tbody[id^="day-"] tr td:first-child {
+  font-size: 1.4em;
+  font-weight: bold;
+}
+
+
+/* Tagessumme (rechts unten) und Kundenanzahl fett */
+tbody[id^="day-"] tr:last-child td:last-child,
+tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
+  font-weight: bold;
+}
+
 </style>
 <script>
 // --- Globale Variablen ---
@@ -280,16 +329,23 @@ function handleEnter(e){
 // freien Tages an ("urlaub" oder "krank").
 function toggleFreeDay(day){
   const key = "cf-" + selYear + "-" + selMonth + "-" + day;
-  const existing = localStorage.getItem(key);
-  if (existing) {
-    // vorhandene Markierung entfernen
+  const current = localStorage.getItem(key);
+
+  let next;
+  if(current === null){
+    next = "urlaub";
+  } else if(current === "urlaub"){
+    next = "krank";
+  } else if(current === "krank"){
+    next = null;
+  }
+
+  if(next === null){
     localStorage.removeItem(key);
   } else {
-    // den Benutzer nach der Art fragen: OK=Urlaubstag, Abbrechen=Krankheitstag
-    const isUrlaub = confirm("Urlaubstag festlegen?\n(Abbrechen = Krankheitstag)");
-    const value = isUrlaub ? "urlaub" : "krank";
-    localStorage.setItem(key, value);
+    localStorage.setItem(key, next);
   }
+
   updateMonth();  // neu aufbauen
 }
 
@@ -661,11 +717,60 @@ function exportCSV(){
     background: white !important;
   }
 }
+
+/* Äußerer Rahmen pro Tag */
+tbody[id^="day-"] {
+  border: 2px solid #333;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+/* Keine Rahmen innerhalb eines Tagesblocks */
+tbody[id^="day-"] td,
+tbody[id^="day-"] tr {
+  border: none !important;
+  outline: none !important;
+}
+
+/* Inputs bleiben sichtbar, aber dezent */
+tbody[id^="day-"] input {
+  border: 1px solid #ccc;
+}
+
+
+/* Größere Darstellung der Tageszahlen (erste Spalte) */
+tbody[id^="day-"] tr:first-child td:first-child {
+  font-size: 1.4em;
+  font-weight: bold;
+}
+
+
+/* Auch Tageszahlen in freien Tagen (z. B. Samstag, Sonntag, Feiertag) größer darstellen */
+tr.frei td span.fett {
+  font-size: 1.4em;
+}
+
+
+/* Auch reguläre Tageszahlen größer darstellen */
+tbody[id^="day-"] tr td:first-child {
+  font-size: 1.4em;
+  font-weight: bold;
+}
+
+
+/* Tagessumme (rechts unten) und Kundenanzahl fett */
+tbody[id^="day-"] tr:last-child td:last-child,
+tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
+  font-weight: bold;
+}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V87</h1>
+<h1>Einnahmen V89</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span>
