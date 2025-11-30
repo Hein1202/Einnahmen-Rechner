@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V98</title>
+<title>Einnahmen V101</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -140,6 +140,17 @@ th, td { border:1px solid black; padding:6px; text-align:center; }
   cursor: pointer;
   margin-top: 4px;
 }
+.missing-day-hint-inline {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 2px solid #b30000;
+  background: #ffecec;
+  color: #b30000;
+  font-weight: bold;
+  border-radius: 6px;
+  font-size: 0.9em;
+}
+
 
 
 /* Highlight auf dem Kreis bei Hover */
@@ -375,6 +386,132 @@ function isFreeDay(day){
   return getFreeDayType(day) !== null;
 }
 
+// Zusätzliche Helfer für die Erkennung fehlender Einträge im vorherigen Arbeitstag.
+
+// Prüft, ob ein bestimmter Tag (im aktuellen Monat) ein relevanter Arbeitstag ist,
+// d.h. kein Wochenende, kein Feiertag und kein als frei (Urlaub/Krank) markierter Tag.
+function isRelevantWorkday(day) {
+  if (day < 1 || day > selDays) return false;
+  const date = new Date(selYear, selMonth, day);
+  const weekday = date.toLocaleDateString("de-DE", { weekday: "long" }).toLowerCase();
+  if (weekday === "samstag" || weekday === "sonntag") return false;
+  const ds = fmt(date);
+  if (holidays && holidays[ds]) return false;
+  if (isFreeDay(day)) return false;
+  return true;
+}
+
+// Sucht den letzten relevanten Arbeitstag vor dem angegebenen Tag.
+function findPreviousWorkday(currentDay) {
+  for (let d = currentDay - 1; d >= 1; d--) {
+    if (isRelevantWorkday(d)) return d;
+  }
+  return null;
+}
+
+// Prüft, ob an dem angegebenen Tag mindestens ein Eintrag mit Betrag > 0 existiert.
+function dayHasAnyEntry(day) {
+  const tbody = document.getElementById("day-" + day);
+  if (!tbody) return false;
+  const rows = tbody.querySelectorAll("tr.entry-row");
+  for (const row of rows) {
+    const a1Str = row.querySelector(".amount1")?.value || "";
+    const a2Str = row.querySelector(".amount2")?.value || "";
+    const num1 = parseFloat(String(a1Str).replace(",", "."));
+    const num2 = parseFloat(String(a2Str).replace(",", "."));
+    if ((!isNaN(num1) && num1 > 0) || (!isNaN(num2) && num2 > 0)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+let lastMissingDay = null;
+let lastMissingHintRow = null;
+
+// Zeigt einen Hinweis inline unter dem aktuellen Tag an, dass für einen
+// vorherigen Tag keine Einträge vorhanden sind und bietet an, diesen
+// als Urlaubstag / Krankheitstag zu markieren oder zu ihm zu springen.
+// missingDay  = der Tag, an dem keine Einträge vorhanden sind
+// currentDay  = der Tag, an dem gerade eine Eingabe vorgenommen wurde
+function showMissingDayHint(missingDay, currentDay) {
+  lastMissingDay = missingDay;
+
+  // vorhandenen Inline-Hinweis entfernen
+  hideMissingDayHint();
+
+  const currentTbody = document.getElementById("day-" + currentDay);
+  if (!currentTbody) return;
+
+  const dateStr = String(missingDay).padStart(2, "0") + "." + String(selMonth + 1).padStart(2, "0") + "." + selYear;
+
+  const tr = document.createElement("tr");
+  tr.className = "missing-day-hint-inline-row";
+  const td = document.createElement("td");
+  td.colSpan = 5;
+  td.innerHTML =
+    '<div class="missing-day-hint-inline">' +
+    'Hinweis: Am ' + dateStr + ' wurde kein Eintrag gemacht.<br/>' +
+    '<button type="button" onclick="markMissingDayAs(\'urlaub\')">Als Urlaubstag markieren</button> ' +
+    '<button type="button" onclick="markMissingDayAs(\'krank\')">Als Krankheitstag markieren</button> ' +
+    '<button type="button" onclick="scrollToMissingDay()">Zu diesem Tag springen</button>' +
+    '</div>';
+  tr.appendChild(td);
+
+  // Hinweis direkt vor der Tagessummen-Zeile einfügen, falls vorhanden
+  const summaryRow = currentTbody.querySelector("tr.day-summary");
+  if (summaryRow) {
+    currentTbody.insertBefore(tr, summaryRow);
+  } else {
+    currentTbody.appendChild(tr);
+  }
+
+  lastMissingHintRow = tr;
+}
+
+function hideMissingDayHint() {
+  if (lastMissingHintRow && lastMissingHintRow.parentNode) {
+    lastMissingHintRow.parentNode.removeChild(lastMissingHintRow);
+  }
+  lastMissingHintRow = null;
+}
+
+// Markiert den zuletzt gemeldeten fehlenden Tag als Urlaub oder Krank
+// und baut den Monat neu auf.
+function markMissingDayAs(type) {
+  if (!lastMissingDay) return;
+  const key = "cf-" + selYear + "-" + selMonth + "-" + lastMissingDay;
+  if (type === "urlaub" || type === "krank") {
+    localStorage.setItem(key, type);
+  }
+  hideMissingDayHint();
+  updateMonth();
+}
+
+// Scrollt zum zuletzt gemeldeten fehlenden Tag.
+function scrollToMissingDay() {
+  if (!lastMissingDay) return;
+  const tbody = document.getElementById("day-" + lastMissingDay);
+  if (!tbody) return;
+  const rect = tbody.getBoundingClientRect();
+  const target = rect.top + window.pageYOffset - 60;
+  window.scrollTo({ top: target < 0 ? 0 : target, behavior: "smooth" });
+}
+
+// Wird nach der Aktualisierung eines Tages aufgerufen, um zu prüfen,
+// ob der vorherige relevante Arbeitstag leer ist.
+function checkPreviousWorkdayForMissingEntries(day) {
+  if (day <= 1) return;
+  const prev = findPreviousWorkday(day);
+  if (!prev) return;
+  if (!dayHasAnyEntry(prev)) {
+    showMissingDayHint(prev, day);
+  } else if (lastMissingDay === prev) {
+    // Falls der vorherige Tag inzwischen Einträge hat, Hinweis ggf. ausblenden
+    hideMissingDayHint();
+  }
+}
+
 // Monatsnavigation
 function prevMonth(){
   selMonth--;
@@ -532,6 +669,12 @@ function updateDay(day){
 
   saveDay(day);
   updateTotals();
+
+  // Wenn an diesem Tag nun eine Summe > 0 vorhanden ist, prüfen,
+  // ob der vorherige Arbeitstag ohne Eintrag ist.
+  if (sum > 0) {
+    checkPreviousWorkdayForMissingEntries(day);
+  }
 }
 
 function saveDay(day){
@@ -794,7 +937,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V98</h1>
+<h1>Einnahmen V101</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span>
