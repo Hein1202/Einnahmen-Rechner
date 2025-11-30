@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V96</title>
+<title>Einnahmen V97</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -630,7 +630,8 @@ function exportJSON(){
     if(raw) data.days[key] = JSON.parse(raw);
 
     const cf = "cf-" + selYear + "-" + selMonth + "-" + d;
-    if(localStorage.getItem(cf)) data.free[cf] = 1;
+    const freeVal = localStorage.getItem(cf);
+    if(freeVal) data.free[cf] = freeVal;
   }
 
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
@@ -657,7 +658,16 @@ function importJSON(ev){
       }
       if(data.free){
         for(const key in data.free){
-          localStorage.setItem(key, "1");
+          const val = data.free[key];
+          // Ältere Exporte speicherten nur "1" → standardmäßig als "urlaub" interpretieren
+          if(val === 1 || val === "1" || val === true){
+            localStorage.setItem(key, "urlaub");
+          } else if(val === "urlaub" || val === "krank") {
+            localStorage.setItem(key, val);
+          } else {
+            // Unbekannte Werte ebenfalls als Urlaub behandeln, damit zyklisches Umschalten funktioniert
+            localStorage.setItem(key, "urlaub");
+          }
         }
       }
       if(data.totalTip !== undefined){
@@ -785,7 +795,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V96</h1>
+<h1>Einnahmen V97</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span>
