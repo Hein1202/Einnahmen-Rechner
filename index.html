@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V90</title>
+<title>Einnahmen V96</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -108,27 +108,42 @@ th, td { border:1px solid black; padding:6px; text-align:center; }
 /* Scroll button to jump from a day to the monthly overview */
 /* Base cell style: empty by default */
 .scroll-to-summary {
-  width: 28px;
-  height: 28px;
-  text-align: center;
-  vertical-align: middle;
   cursor: pointer;
-  padding: 0;
-  font-size: 1em;
+  padding: 0 4px;
+  font-size: 0.95em;
 }
 
-/* Active state: show a circular button around the arrow */
-.scroll-to-summary.active {
-  border: 2px solid #444;
+/* Kreis mit Pfeil */
+.scroll-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background: #f0f0f0;
-  font-size: 1.2em;
-  line-height: 24px;
+  border: 2px solid #244b79;
+  background: #cfe2ff; /* leichtes Blau */
+  font-size: 1.3em;
+  line-height: 1;
   font-weight: bold;
 }
 
-/* Highlight on hover */
-.scroll-to-summary.active:hover {
+/* Text neben dem Kreis */
+.scroll-text {
+  margin-left: 4px;
+  white-space: nowrap;
+}
+.scroll-back-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+
+/* Highlight auf dem Kreis bei Hover */
+.scroll-to-summary:hover .scroll-circle {
   background: #d8eaff;
 }
 
@@ -770,7 +785,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V90</h1>
+<h1>Einnahmen V96</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span>
@@ -805,7 +820,12 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <button onclick="exportJSON()">Datei speichern</button>
 <input accept="application/json" id="data-file-input" onchange="importJSON(event)" style="display:none;" type="file"/>
 <button onclick="document.getElementById('data-file-input').click()" style="margin-left:10px;">Datei laden</button>
-<button onclick="clearAllData()" style="margin-left:10px;">Alle Daten löschen</button>
+<div style="display:inline-block; margin-left:10px;">
+  <button onclick="clearAllData()">Alle Daten löschen</button><br/>
+  <span class="scroll-back-wrapper" onclick="scrollBackToLastEntry()" title="Zum letzten Eintrag springen">
+    <span class="scroll-circle">↑</span><span class="scroll-text"> zum letzten Eintrag</span>
+  </span>
+</div>
 <button onclick="exportExcel()" style="margin-left:10px;">📊 Excel speichern</button></div>
 <div id="onscreen-totals" style="margin-top:20px;">
 <h3>Monatsübersicht</h3>
@@ -816,10 +836,6 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <tr><th>Netto</th><td id="net-total"></td></tr>
 <tr><th>MwSt</th><td id="tax-total"></td></tr>
 </table>
-</div>
-<div style="margin-top: 10px; text-align: right;">
-<!-- Button zum Zurückscrollen zum letzten Eintrag -->
-<button onclick="scrollBackToLastEntry()">↑ Zurück zum letzten Eintrag</button>
 </div>
 <div class="print-summary" style="display:none;">
 <h3>Monatsübersicht (Druck)</h3>
@@ -1009,17 +1025,17 @@ function updateScrollArrow(row) {
   if (currentScrollRow && currentScrollRow !== row) {
     const prevCell = currentScrollRow.querySelector('.scroll-to-summary');
     if (prevCell) {
-      prevCell.textContent = '';
+      prevCell.innerHTML = '';
       prevCell.classList.remove('active');
       prevCell.removeAttribute('title');
     }
   }
   currentScrollRow = row;
-  // Set arrow on current row
+  // Set arrow and Text auf der aktuellen Zeile
   if (row) {
     const cell = row.querySelector('.scroll-to-summary');
     if (cell) {
-      cell.textContent = '↓';
+      cell.innerHTML = '<span class="scroll-circle">↓</span><span class="scroll-text"> zur Monatsübersicht</span>';
       cell.classList.add('active');
       cell.setAttribute('title', 'Zur Monatsübersicht scrollen');
     }
