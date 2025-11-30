@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V97</title>
+<title>Einnahmen V98</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -460,7 +460,6 @@ function buildTable(){
         `;
     } else {
       tb.innerHTML = `
-        <tr><td colspan="5"><button onclick="addRow(${day})">Neue Zeile für ${day}</button></td></tr>
         <tr class="entry-row">
           <td class="day-cell" onclick="toggleFreeDay(${day})">${day}</td>
           <td><input class="amount1 empty-input" type="number" step="0.01" lang="de" oninput="checkInput(this); updateDay(${day})" onkeydown="handleEnter(event)"></td>
@@ -795,7 +794,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V97</h1>
+<h1>Einnahmen V98</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span>
