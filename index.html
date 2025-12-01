@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V114</title>
+<title>Einnahmen V116</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -89,7 +89,23 @@ tr.entry-row td {
   font-weight:bold;
   font-style:italic;
 }
+
+/* Spezielle Farben für Beschriftung von Urlaub und Krankheit */
+.customfree .day-cell small .label-urlaub {
+  color: #2a8f3a;
+}
+.customfree .day-cell small .label-krank {
+  color: #3a5f85;
+}
 .day-cell { cursor:pointer; font-weight:bold; }
+
+/* Sonntage und Feiertage: Tageszahl + Text in Rot darstellen */
+.weekend.sunday .day-cell,
+.weekend.sunday .day-cell small,
+.holiday .day-cell,
+.holiday .day-cell small {
+  color: #b30000;
+}
 
 /* Druckmodus optimieren */
 @media print {
@@ -649,9 +665,11 @@ function buildTable(){
   for(let day = 1; day <= selDays; day++){
     const date = new Date(selYear, selMonth, day);
     const weekday = date.toLocaleDateString("de-DE",{weekday:"long"}).toLowerCase();
+    const weekdayLabel = weekday.charAt(0).toUpperCase() + weekday.slice(1);
     const ds = fmt(date);
     const isHoliday = (holidays[ds] != null);
     const isWeekend = (weekday === "samstag" || weekday === "sonntag");
+    const isSunday  = (weekday === "sonntag");
     // Den Typ des eigenen freien Tages ermitteln ("urlaub", "krank" oder null)
     const freeType = getFreeDayType(day);
     const isFree = freeType !== null;
@@ -661,8 +679,9 @@ function buildTable(){
     tb.id = "day-" + day;
 
     if(isHoliday){
+      const holidayName = holidays[ds] || "Feiertag";
       tb.innerHTML = `<tr class="holiday">
-        <td class="day-cell" onclick="toggleFreeDay(${day})">${day}<br><small>Feiertag</small></td>
+        <td class="day-cell" onclick="toggleFreeDay(${day})">${day}<br><small>${weekdayLabel} – ${holidayName}</small></td>
         <td colspan="4">Kein Arbeitstag</td>
       </tr>
         <tr class="day-summary">
@@ -673,8 +692,9 @@ function buildTable(){
         </tr>
         `;
     } else if(isWeekend){
-      tb.innerHTML = `<tr class="weekend">
-        <td class="day-cell" onclick="toggleFreeDay(${day})">${day}<br><small>${weekday}</small></td>
+      const weekendClass = isSunday ? "weekend sunday" : "weekend";
+      tb.innerHTML = `<tr class="${weekendClass}">
+        <td class="day-cell" onclick="toggleFreeDay(${day})">${day}<br><small>${weekdayLabel}</small></td>
         <td colspan="4">Kein Arbeitstag</td>
       </tr>
         <tr class="day-summary">
@@ -686,7 +706,11 @@ function buildTable(){
         `;
     } else if(isFree){
       // Je nach Typ des eigenen freien Tages eine passende Beschriftung wählen
-      const label = freeType === "urlaub" ? "Urlaubstag" : (freeType === "krank" ? "Krankheitstag" : "Eigener freier Tag");
+      const label = freeType === "urlaub"
+        ? '<span class="label-urlaub">Urlaubstag</span>'
+        : (freeType === "krank"
+           ? '<span class="label-krank">Krankheitstag</span>'
+           : "Eigener freier Tag");
       // Bei eigenen freien Tagen soll die Beschriftung "Kein Arbeitstag" entfallen.
       tb.innerHTML = `<tr class="customfree">
         <td class="day-cell" onclick="toggleFreeDay(${day})">${day}<br><small>${label}</small></td>
@@ -778,6 +802,14 @@ function updateDay(day){
   // ob der vorherige Arbeitstag ohne Eintrag ist.
   if (sum > 0) {
     checkPreviousWorkdayForMissingEntries(day);
+  }
+
+  // Falls der aktuell bearbeitete Tag selbst der zuletzt gemeldete
+  // fehlende Tag ist und nun einen Eintrag hat, den Hinweis ausblenden.
+  if (typeof lastMissingDay !== "undefined" && lastMissingDay === day) {
+    if (dayHasAnyEntry(day)) {
+      hideMissingDayHint();
+    }
   }
 }
 
@@ -1043,7 +1075,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V114</h1>
+<h1>Einnahmen V116</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span>
@@ -1143,7 +1175,11 @@ function generateReducedPrint() {
         // Datum im Format TT.MM.JJJJ
         const date = String(d).padStart(2, "0") + "." + String(selMonth + 1).padStart(2, "0") + "." + selYear;
         // Menschlich lesbare Beschriftung abhängig vom Typ
-        const label = freeType === "urlaub" ? "Urlaubstag" : (freeType === "krank" ? "Krankheitstag" : "Eigener freier Tag");
+        const label = freeType === "urlaub"
+        ? '<span class="label-urlaub">Urlaubstag</span>'
+        : (freeType === "krank"
+           ? '<span class="label-krank">Krankheitstag</span>'
+           : "Eigener freier Tag");
         output += date.padEnd(12) + label + "\n\n";
       }
       continue;
