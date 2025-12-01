@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V116</title>
+<title>Einnahmen V117</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -707,9 +707,9 @@ function buildTable(){
     } else if(isFree){
       // Je nach Typ des eigenen freien Tages eine passende Beschriftung wählen
       const label = freeType === "urlaub"
-        ? '<span class="label-urlaub">Urlaubstag</span>'
+        ? '<span class="label-urlaub">🌴 Urlaubstag</span>'
         : (freeType === "krank"
-           ? '<span class="label-krank">Krankheitstag</span>'
+           ? '<span class="label-krank">🤒 Krankheitstag</span>'
            : "Eigener freier Tag");
       // Bei eigenen freien Tagen soll die Beschriftung "Kein Arbeitstag" entfallen.
       tb.innerHTML = `<tr class="customfree">
@@ -1075,7 +1075,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V116</h1>
+<h1>Einnahmen V117</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span>
@@ -1176,9 +1176,9 @@ function generateReducedPrint() {
         const date = String(d).padStart(2, "0") + "." + String(selMonth + 1).padStart(2, "0") + "." + selYear;
         // Menschlich lesbare Beschriftung abhängig vom Typ
         const label = freeType === "urlaub"
-        ? '<span class="label-urlaub">Urlaubstag</span>'
+        ? '<span class="label-urlaub">🌴 Urlaubstag</span>'
         : (freeType === "krank"
-           ? '<span class="label-krank">Krankheitstag</span>'
+           ? '<span class="label-krank">🤒 Krankheitstag</span>'
            : "Eigener freier Tag");
         output += date.padEnd(12) + label + "\n\n";
       }
