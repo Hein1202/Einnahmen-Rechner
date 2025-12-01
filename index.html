@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V112</title>
+<title>Einnahmen V113</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -52,15 +52,37 @@ th, td { border:1px solid black; padding:6px; text-align:center; }
   display: block;
   margin: 0 auto; /* exakt gleiche vertikale Ausrichtung wie Betrag 1 */
 }
+
+/* Zellen der Eingabezeilen oben ausrichten, damit Betrag 1 und Betrag 2
+   (inkl. Button) bündig nebeneinander stehen. */
+tr.entry-row td {
+  vertical-align: top;
+}
+
+/* Wrapper von Betrag 2 kompakt halten und neben Betrag 1 platzieren */
+.amount2-wrapper {
+  display: inline-block;
+  vertical-align: top;
+  margin: 0;
+  padding: 0;
+}
+
+/* Toggle-Button direkt unter dem zweiten Feld, ohne extra Abstand nach oben */
+.toggle-amount2 {
+  display: inline-block;
+  vertical-align: top;
+  margin-top: 0;
+  font-size: 0.8em;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
 .empty-input { background-color:lightgray; }
 .amount1:not(.empty-input),
 .amount2:not(.empty-input),
-#total-tip:not(.empty-input) { font-weight:bo
-
-.toggle-amount2 {
-  margin-top: 20px;
+#total-tip:not(.empty-input) {
+  font-weight: bold;
 }
-ld; }
 
 .weekend, .holiday, .customfree {
   background:#ddd;
@@ -99,15 +121,6 @@ ld; }
   border-radius: 6px;
 }
 
-.amount2-wrapper {
-  margin-bottom: 2px;
-}
-
-.toggle-amount2 {
-  font-size: 0.8em;
-  padding: 2px 6px;
-  cursor: pointer;
-}
 
 /* Scroll button to jump from a day to the monthly overview */
 /* Base cell style: empty by default */
@@ -199,20 +212,6 @@ tbody[id^="day-"] tr {
 /* Inputs bleiben sichtbar, aber dezent */
 tbody[id^="day-"] input {
   border: 1px solid #ccc;
-}
-
-/*
- * Align the contents of each entry row's cells to the top. Without this
- * explicit setting, table cells default to vertically centering their
- * contents. Since the second amount cell can contain both the input field
- * and its toggle button, the browser was centering the combined content
- * relative to the neighbouring cell. This resulted in the second amount
- * input sitting lower than the first amount input when both were visible.
- * Setting a top alignment on the cells of entry rows ensures that the top
- * edges of the input fields line up neatly across the row.
- */
-tr.entry-row td {
-  vertical-align: top;
 }
 
 
@@ -369,15 +368,14 @@ function updateAmount2ButtonsVisibility(){
 }
 
 function handleEnter(e){
-  // On some mobile devices (e.g. Android/Chrome) the virtual keyboard's “Next”
-  // button emits a Tab key event instead of an Enter key event. By also
-  // checking for the Tab key we ensure that pressing the action key on
-  // smartphones triggers the same logic as pressing Enter on desktop. See
-  // related discussions about mobile keyboards emitting keycode 9 (Tab) for
-  // the “Next” key【266852002839454†L144-L150】 and using the enterkeyhint attribute
-  // to influence keyboard behaviour【266852002839454†L241-L248】.
+  // Auf Desktop funktioniert Enter normal, auf vielen Smartphones sendet die
+  // Action-Taste der Bildschirmtastatur jedoch "Next"/Tab. Wir behandeln
+  // deshalb sowohl Enter als auch Tab (keyCode 13 bzw. 9) als Auslöser.
   const k = e.key;
-  if(k === "Enter" || k === "Tab"){
+  const code = e.keyCode || e.which;
+  const isActionKey = (k === "Enter" || k === "Tab" || code === 13 || code === 9);
+
+  if(isActionKey){
     e.preventDefault();
     const currentRow = e.target.closest("tr.entry-row");
     if(!currentRow) return;
@@ -414,6 +412,43 @@ function handleEnter(e){
           }
         }
       }
+    }
+  }
+}
+
+// Fallback speziell für Smartphones: Wenn der Benutzer das letzte
+// Betragsfeld eines Tages verlässt und dort ein Wert steht, wird automatisch
+// eine neue Zeile für diesen Tag angelegt.
+function handleExit(e){
+  const input = e.target;
+  const currentRow = input.closest("tr.entry-row");
+  if(!currentRow) return;
+  const tbody = currentRow.parentElement;
+  if(!tbody || !tbody.id || !tbody.id.startsWith("day-")) return;
+
+  const rows = Array.from(tbody.querySelectorAll("tr.entry-row"));
+  const idx = rows.indexOf(currentRow);
+  if(idx === -1 || idx < rows.length - 1) return; // nicht letzte Zeile
+
+  const a1 = currentRow.querySelector("input.amount1");
+  const a2 = currentRow.querySelector("input.amount2");
+  const hasValue =
+    (a1 && a1.value !== "") ||
+    (a2 && a2.value !== "");
+  if(!hasValue) return; // Zeile leer → nichts tun
+
+  const dayStr = tbody.id.split("-")[1];
+  const day = parseInt(dayStr, 10);
+  if(isNaN(day)) return;
+
+  addRow(day);
+  const newRows = tbody.querySelectorAll("tr.entry-row");
+  const lastRow = newRows[newRows.length - 1];
+  const firstInput = lastRow.querySelector("input.amount1");
+  if(firstInput){
+    firstInput.focus();
+    if(typeof firstInput.select === "function"){
+      firstInput.select();
     }
   }
 }
@@ -669,10 +704,10 @@ function buildTable(){
       tb.innerHTML = `
         <tr class="entry-row">
           <td class="day-cell" onclick="toggleFreeDay(${day})">${day}</td>
-          <td><input class="amount1 empty-input" type="number" step="0.01" lang="de" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)"></td>
+          <td><input class="amount1 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)" onblur="handleExit(event)"></td>
           <td>
             <div class="amount2-wrapper" style="display:none;">
-              <input class="amount2 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)">
+              <input class="amount2 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)" onblur="handleExit(event)">
             </div>
             <button type="button" class="toggle-amount2" style="display:none;" onclick="toggleAmount2(this, ${day})">+ Betrag 2</button>
           </td>
@@ -697,10 +732,10 @@ function addRow(day){
   tr.classList.add("entry-row");
   tr.innerHTML = `
     <td></td>
-          <td><input class="amount1 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)"></td>
+    <td><input class="amount1 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)" onblur="handleExit(event)"></td>
     <td>
       <div class="amount2-wrapper" style="display:none;">
-        <input class="amount2 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)">
+        <input class="amount2 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)" onblur="handleExit(event)">
       </div>
       <button type="button" class="toggle-amount2" style="display:none;" onclick="toggleAmount2(this, ${day})">+ Betrag 2</button>
     </td>
@@ -1009,7 +1044,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V112</h1>
+<h1>Einnahmen V113</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span>
