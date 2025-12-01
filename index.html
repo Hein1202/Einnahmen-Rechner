@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V113</title>
+<title>Einnahmen V114</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -558,8 +558,7 @@ function showMissingDayHint(missingDay, currentDay) {
     '<div class="missing-day-hint-inline">' +
     'Hinweis: Am ' + dateStr + ' wurde kein Eintrag gemacht.<br/>' +
     '<button type="button" onclick="markMissingDayAs(\'urlaub\')">Als Urlaubstag markieren</button> ' +
-    '<button type="button" onclick="markMissingDayAs(\'krank\')">Als Krankheitstag markieren</button> ' +
-    '<button type="button" onclick="scrollToMissingDay()">Zu diesem Tag springen</button>' +
+    '<button type="button" onclick="markMissingDayAs(\'krank\')">Als Krankheitstag markieren</button>' +
     '</div>';
   tr.appendChild(td);
 
@@ -1044,7 +1043,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V113</h1>
+<h1>Einnahmen V114</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span>
