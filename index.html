@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V127</title>
+<title>Einnahmen V136</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -66,6 +66,29 @@ tr.entry-row td {
   margin: 0;
   padding: 0;
 }
+.amount2-open-hint {
+  margin-top: 2px;
+  font-size: 0.8em;
+  color: #b30000;
+}
+
+.amount1-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.amount1-wrapper input.amount1 {
+  min-width: 0;
+}
+
+.copy-prev-amount {
+  padding: 0 4px;
+  font-size: 0.8em;
+  line-height: 1.4;
+  border-radius: 4px;
+}
+
 
 .amount-error-hint {
   margin-top: 2px;
@@ -388,12 +411,18 @@ function toggleAmount2(btn, day){
       input.value = "";
       checkInput(input);
     }
+    // Eventuellen Hinweis zum offenen Betrag 2 entfernen
+    if (wrapper) {
+      const hint = wrapper.querySelector(".amount2-open-hint");
+      if (hint) hint.remove();
+    }
     btn.textContent = "+ Betrag 2";
     updateDay(day);
   }
   // Nach Änderung Betrag-2-Status Buttons neu bewerten
   updateAmount2ButtonsVisibility();
 }
+
 
 
 let currentAmount1Row = null;
@@ -417,20 +446,34 @@ function updateAmount2ButtonsVisibility(){
     const btn = row.querySelector(".toggle-amount2");
     const wrapper = row.querySelector(".amount2-wrapper");
     const a2 = row.querySelector(".amount2");
-    if (!btn) return;
+    const copyBtn = row.querySelector(".copy-prev-amount");
 
-    const hasAmount2 = a2 && a2.value !== "";
-    const wrapperVisible = wrapper && wrapper.style.display !== "none" && wrapper.style.display !== "";
+    if (btn) {
+      const hasAmount2 = a2 && a2.value !== "";
+      const wrapperVisible = wrapper && wrapper.style.display !== "none" && wrapper.style.display !== "";
 
-    if (hasAmount2 || wrapperVisible) {
-      // Betrag 2 ist aktiv → Button (meist "− Betrag 2") immer anzeigen
-      btn.style.display = "inline-block";
-    } else if (row === currentAmount1Row) {
-      // Aktuelle Zeile ohne Betrag 2 → "+ Betrag 2" anzeigen
-      btn.style.display = "inline-block";
-    } else {
-      // Andere Zeilen ohne Betrag 2 → Button verbergen
-      btn.style.display = "none";
+      if (hasAmount2 || wrapperVisible) {
+        // Betrag 2 ist aktiv → Button (meist "− Betrag 2") immer anzeigen
+        btn.style.display = "inline-block";
+      } else if (row === currentAmount1Row) {
+        // Aktuelle Zeile ohne Betrag 2 → "+ Betrag 2" anzeigen
+        btn.style.display = "inline-block";
+      } else {
+        // Andere Zeilen ohne Betrag 2 → Button verbergen
+        btn.style.display = "none";
+      }
+    }
+
+    // Wiederhol-Button (↺) nur in der aktuell aktiven Zeile anzeigen.
+    if (copyBtn) {
+      const allRows = Array.from(document.querySelectorAll('tbody[id^="day-"] tr.entry-row'));
+      const isFirstGlobal = allRows.length > 0 && allRows[0] === row;
+
+      if (row === currentAmount1Row) {
+        if (!isFirstGlobal) copyBtn.style.display = "inline-block"; else copyBtn.style.display = "none";
+      } else {
+        copyBtn.style.display = "none";
+      }
     }
   });
 }
@@ -804,7 +847,7 @@ function buildTable(){
       tb.innerHTML = `
         <tr class="entry-row">
           <td class="day-cell" onclick="toggleFreeDay(${day})">${day}</td>
-          <td><input class="amount1 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)" onblur="handleExit(event)"></td>
+          <td><div class="amount1-wrapper"><input class="amount1 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)" onblur="handleExit(event)"><button type="button" class="copy-prev-amount" onclick="copyPrevAmount(this)" title="Letzten Betrag übernehmen">↺</button></div></td>
           <td>
             <div class="amount2-wrapper" style="display:none;">
               <input class="amount2 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)" onblur="handleExit(event)">
@@ -832,7 +875,7 @@ function addRow(day){
   tr.classList.add("entry-row");
   tr.innerHTML = `
     <td></td>
-    <td><input class="amount1 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)" onblur="handleExit(event)"></td>
+    <td><div class="amount1-wrapper"><input class="amount1 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)" onblur="handleExit(event)"><button type="button" class="copy-prev-amount" onclick="copyPrevAmount(this)" title="Letzten Betrag übernehmen">↺</button></div></td>
     <td>
       <div class="amount2-wrapper" style="display:none;">
         <input class="amount2 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)" onblur="handleExit(event)">
@@ -1155,7 +1198,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V127</h1>
+<h1>Einnahmen V136</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span>
@@ -1398,6 +1441,32 @@ document.addEventListener('click', function(event) {
 
 // Keep track of which entry row currently holds the scroll indicator
 
+function updateEmptyAmount2Hint(row) {
+  if (!row) return;
+  const wrapper2 = row.querySelector(".amount2-wrapper");
+  const a2 = row.querySelector(".amount2");
+  if (!wrapper2 || !a2) return;
+
+  // Sichtbarkeit der zweiten Betragszeile prüfen
+  const style = window.getComputedStyle(wrapper2);
+  const visible = style.display !== "none";
+
+  let hint = wrapper2.querySelector(".amount2-open-hint");
+
+  if (visible && !a2.value) {
+    if (!hint) {
+      hint = document.createElement("div");
+      hint.className = "amount2-open-hint";
+      hint.textContent = "Betrag 2 wurde geöffnet, aber nicht ausgefüllt.";
+      wrapper2.appendChild(hint);
+    } else {
+      hint.textContent = "Betrag 2 wurde geöffnet, aber nicht ausgefüllt.";
+    }
+  } else {
+    if (hint) hint.remove();
+  }
+}
+
 // Hilfsfunktion: Liefert die Tagesnummer (1..31) für eine Eintragszeile
 // oder null, falls die Zeile keinem Tag zugeordnet werden kann.
 function getDayFromEntryRow(row) {
@@ -1418,20 +1487,68 @@ function removeTrailingEmptyRow(day) {
   if (day == null) return;
   const tbody = document.getElementById("day-" + day);
   if (!tbody) return;
-  const rows = tbody.querySelectorAll("tr.entry-row");
-  if (rows.length <= 1) return; // mindestens eine Zeile pro Tag behalten
 
-  const lastRow = rows[rows.length - 1];
-  const a1 = lastRow.querySelector(".amount1");
-  const a2 = lastRow.querySelector(".amount2");
-  const hasValue = (a1 && a1.value !== "") || (a2 && a2.value !== "");
-  if (!hasValue) {
+  let rows = tbody.querySelectorAll("tr.entry-row");
+  let removed = false;
+
+  // Alle leeren Zeilen am Ende eines Tages entfernen, aber immer
+  // mindestens eine Zeile pro Tag übrig lassen.
+  while (rows.length > 1) {
+    const lastRow = rows[rows.length - 1];
+    const a1 = lastRow.querySelector(".amount1");
+    const a2 = lastRow.querySelector(".amount2");
+    const hasValue = (a1 && a1.value !== "") || (a2 && a2.value !== "");
+    if (hasValue) break;
     lastRow.remove();
+    removed = true;
+    rows = tbody.querySelectorAll("tr.entry-row");
+  }
+
+  if (removed) {
     updateDay(day);
   }
 }
 
+
+function copyPrevAmount(button) {
+  const row = button.closest('tr.entry-row');
+  if (!row) return;
+
+  // Alle Eintragszeilen im Monat in Dokument-Reihenfolge holen
+  const allRows = Array.from(document.querySelectorAll('tbody[id^="day-"] tr.entry-row'));
+  const idx = allRows.indexOf(row);
+  if (idx <= 0) return; // keine vorherige Zeile im Monat
+
+  // Geeignete vorherige Zeile mit einem gesetzten Betrag 1 suchen
+  let prevInput = null;
+  for (let i = idx - 1; i >= 0; i--) {
+    const candidate = allRows[i].querySelector('.amount1');
+    if (candidate && candidate.value !== "") {
+      prevInput = candidate;
+      break;
+    }
+  }
+  if (!prevInput) return;
+
+  const currentInput = row.querySelector('.amount1');
+  if (!currentInput) return;
+  currentInput.value = prevInput.value;
+  currentInput.classList.remove('empty-input');
+  currentInput.focus();
+  if (typeof currentInput.select === "function") {
+    currentInput.select();
+  }
+
+  if (typeof getDayFromEntryRow === "function") {
+    const day = getDayFromEntryRow(row);
+    if (day != null) {
+      updateDay(day);
+    }
+  }
+}
+
 let lastFocusedDay = null;
+let lastFocusedRow = null;
 
 let currentScrollRow = null;
 
@@ -1469,6 +1586,12 @@ document.addEventListener('focusin', function(e) {
   if (e.target && (e.target.classList.contains('amount1') || e.target.classList.contains('amount2'))) {
     const row = e.target.closest('tr.entry-row');
     if (row) {
+      // Beim Verlassen einer Zeile prüfen, ob dort ein geöffnetes,
+      // aber leeres Betrag-2-Feld existiert und ggf. Hinweis anzeigen.
+      if (lastFocusedRow && lastFocusedRow !== row) {
+        updateEmptyAmount2Hint(lastFocusedRow);
+      }
+
       const day = getDayFromEntryRow(row);
       // Wenn von einem Tag zu einem anderen gewechselt wird, ggf. letzte
       // leere Zusatzzeile im vorherigen Tag entfernen.
@@ -1476,6 +1599,7 @@ document.addEventListener('focusin', function(e) {
         removeTrailingEmptyRow(lastFocusedDay);
       }
       lastFocusedDay = day;
+      lastFocusedRow = row;
       updateScrollArrow(row);
     }
   }
