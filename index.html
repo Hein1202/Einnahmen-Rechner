@@ -1262,7 +1262,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <h1>Einnahmen V138</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
-<span id="selected-month"></span>
+<span id="selected-month"></span><span id="month-lock-toggle" onclick="toggleLock()" style="cursor:pointer; font-size: 1.4em; margin-left: 10px;" title="Monat bearbeiten/sperren">🔓</span>
 <button class="nav-btn" onclick="nextMonth()">►</button>
 </div>
 <table id="main-table">
@@ -1773,5 +1773,133 @@ function exportExcel() {
 }
 
 </script>
+
+<script>
+// Lock-Funktionen für Monatssperre
+function isMonthLocked(year, month) {
+  return localStorage.getItem(`locked-${year}-${month}`) === "1";
+}
+
+function setMonthLocked(year, month, locked) {
+  if (locked) {
+    localStorage.setItem(`locked-${year}-${month}`, "1");
+  } else {
+    localStorage.removeItem(`locked-${year}-${month}`);
+  }
+}
+
+function toggleLock() {
+  const locked = isMonthLocked(selYear, selMonth);
+  setMonthLocked(selYear, selMonth, !locked);
+  applyLockStatus();
+}
+
+function applyLockStatus() {
+  const locked = isMonthLocked(selYear, selMonth);
+  const lockIcon = document.getElementById("month-lock-toggle");
+  if (lockIcon) {
+    lockIcon.textContent = locked ? "🔒" : "🔓";
+    lockIcon.title = locked ? "Monat ist gesperrt. Klick zum Entsperren." : "Monat ist offen. Klick zum Sperren.";
+  }
+
+  document.querySelectorAll("input, button").forEach(el => {
+    if (
+      !el.classList.contains("nav-btn") &&
+      el.id !== "month-lock-toggle" &&
+      !el.closest("#month-nav")
+    ) {
+      el.disabled = locked;
+    }
+  });
+}
+
+// Sperrstatus beim Monatswechsel anwenden
+const _origUpdateMonth = updateMonth;
+updateMonth = function () {
+  _origUpdateMonth();
+  applyLockStatus();
+};
+
+// Sperrstatus beim JSON-Export berücksichtigen
+const _origExportJSON = exportJSON;
+exportJSON = function () {
+  const data = {
+    year: selYear,
+    month: selMonth,
+    days: {},
+    free: {},
+    totalTip: localStorage.getItem("totalTip") || "",
+    locked: isMonthLocked(selYear, selMonth) ? true : false
+  };
+
+  for(let d = 1; d <= selDays; d++){
+    const key = "day-" + selYear + "-" + selMonth + "-" + d;
+    const raw = localStorage.getItem(key);
+    if(raw) data.days[key] = JSON.parse(raw);
+
+    const cf = "cf-" + selYear + "-" + selMonth + "-" + d;
+    const freeVal = localStorage.getItem(cf);
+    if(freeVal) data.free[cf] = freeVal;
+  }
+
+  const defaultName = "einnahmen_" + selYear + "-" + String(selMonth+1).padStart(2,"0") + ".json";
+  let filename = prompt("Dateiname:", defaultName);
+  if (!filename) return;
+  if (!filename.toLowerCase().endsWith(".json")) {
+    filename += ".json";
+  }
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+// Sperrstatus beim Import wiederherstellen
+const _origImportJSON = importJSON;
+importJSON = function (ev) {
+  const file = ev.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if(data.days){
+        for(const key in data.days){
+          localStorage.setItem(key, JSON.stringify(data.days[key]));
+        }
+      }
+      if(data.free){
+        for(const key in data.free){
+          const val = data.free[key];
+          if(val === 1 || val === "1" || val === true){
+            localStorage.setItem(key, "urlaub");
+          } else if(val === "urlaub" || val === "krank") {
+            localStorage.setItem(key, val);
+          } else {
+            localStorage.setItem(key, "urlaub");
+          }
+        }
+      }
+      if(data.totalTip !== undefined){
+        localStorage.setItem("totalTip", data.totalTip);
+      }
+      if(data.locked === true){
+        localStorage.setItem(`locked-${data.year}-${data.month}`, "1");
+      }
+      alert("Import erfolgreich. Seite wird neu geladen.");
+      location.reload();
+    } catch(err) {
+      alert("Fehler beim Import: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+};
+</script>
+
 </body>
 </html>
