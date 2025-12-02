@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V136</title>
+<title>Einnahmen V137</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -66,12 +66,6 @@ tr.entry-row td {
   margin: 0;
   padding: 0;
 }
-.amount2-open-hint {
-  margin-top: 2px;
-  font-size: 0.8em;
-  color: #b30000;
-}
-
 .amount1-wrapper {
   display: inline-flex;
   align-items: center;
@@ -411,18 +405,12 @@ function toggleAmount2(btn, day){
       input.value = "";
       checkInput(input);
     }
-    // Eventuellen Hinweis zum offenen Betrag 2 entfernen
-    if (wrapper) {
-      const hint = wrapper.querySelector(".amount2-open-hint");
-      if (hint) hint.remove();
-    }
     btn.textContent = "+ Betrag 2";
     updateDay(day);
   }
   // Nach Änderung Betrag-2-Status Buttons neu bewerten
   updateAmount2ButtonsVisibility();
 }
-
 
 
 let currentAmount1Row = null;
@@ -1037,11 +1025,32 @@ function exportJSON(){
     if(freeVal) data.free[cf] = freeVal;
   }
 
+  // Standard-Dateinamen vorschlagen
+  const defaultName = "einnahmen_" + selYear + "-" + String(selMonth+1).padStart(2,"0") + ".json";
+
+  // Hinweis, wo gespeichert wird, und Möglichkeit zur Umbenennung
+  const message = "Die Datei wird in Ihrem Standard-Download-Ordner gespeichert (z.B. 'Downloads').\n\n"
+    + "Vorgeschlagener Dateiname:\n" + defaultName + "\n\n"
+    + "Sie können den Dateinamen hier ändern oder einfach mit OK bestätigen.";
+
+  let filename = prompt(message, defaultName);
+  if (filename === null) {
+    // Benutzer hat Abbrechen gewählt → nicht speichern
+    return;
+  }
+  filename = filename.trim();
+  if (!filename) {
+    filename = defaultName;
+  }
+  if (!filename.toLowerCase().endsWith(".json")) {
+    filename += ".json";
+  }
+
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "einnahmen_" + selYear + "-" + String(selMonth+1).padStart(2,"0") + ".json";
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -1198,7 +1207,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V136</h1>
+<h1>Einnahmen V137</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span>
@@ -1441,32 +1450,6 @@ document.addEventListener('click', function(event) {
 
 // Keep track of which entry row currently holds the scroll indicator
 
-function updateEmptyAmount2Hint(row) {
-  if (!row) return;
-  const wrapper2 = row.querySelector(".amount2-wrapper");
-  const a2 = row.querySelector(".amount2");
-  if (!wrapper2 || !a2) return;
-
-  // Sichtbarkeit der zweiten Betragszeile prüfen
-  const style = window.getComputedStyle(wrapper2);
-  const visible = style.display !== "none";
-
-  let hint = wrapper2.querySelector(".amount2-open-hint");
-
-  if (visible && !a2.value) {
-    if (!hint) {
-      hint = document.createElement("div");
-      hint.className = "amount2-open-hint";
-      hint.textContent = "Betrag 2 wurde geöffnet, aber nicht ausgefüllt.";
-      wrapper2.appendChild(hint);
-    } else {
-      hint.textContent = "Betrag 2 wurde geöffnet, aber nicht ausgefüllt.";
-    }
-  } else {
-    if (hint) hint.remove();
-  }
-}
-
 // Hilfsfunktion: Liefert die Tagesnummer (1..31) für eine Eintragszeile
 // oder null, falls die Zeile keinem Tag zugeordnet werden kann.
 function getDayFromEntryRow(row) {
@@ -1548,7 +1531,6 @@ function copyPrevAmount(button) {
 }
 
 let lastFocusedDay = null;
-let lastFocusedRow = null;
 
 let currentScrollRow = null;
 
@@ -1586,12 +1568,6 @@ document.addEventListener('focusin', function(e) {
   if (e.target && (e.target.classList.contains('amount1') || e.target.classList.contains('amount2'))) {
     const row = e.target.closest('tr.entry-row');
     if (row) {
-      // Beim Verlassen einer Zeile prüfen, ob dort ein geöffnetes,
-      // aber leeres Betrag-2-Feld existiert und ggf. Hinweis anzeigen.
-      if (lastFocusedRow && lastFocusedRow !== row) {
-        updateEmptyAmount2Hint(lastFocusedRow);
-      }
-
       const day = getDayFromEntryRow(row);
       // Wenn von einem Tag zu einem anderen gewechselt wird, ggf. letzte
       // leere Zusatzzeile im vorherigen Tag entfernen.
@@ -1599,7 +1575,6 @@ document.addEventListener('focusin', function(e) {
         removeTrailingEmptyRow(lastFocusedDay);
       }
       lastFocusedDay = day;
-      lastFocusedRow = row;
       updateScrollArrow(row);
     }
   }
