@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V118</title>
+<title>Einnahmen V127</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -66,6 +66,13 @@ tr.entry-row td {
   margin: 0;
   padding: 0;
 }
+
+.amount-error-hint {
+  margin-top: 2px;
+  font-size: 0.8em;
+  color: #b30000;
+}
+
 
 /* Toggle-Button direkt unter dem zweiten Feld, ohne extra Abstand nach oben */
 .toggle-amount2 {
@@ -141,7 +148,7 @@ tr.entry-row td {
 /* Scroll button to jump from a day to the monthly overview */
 /* Base cell style: empty by default */
 .scroll-to-summary {
-  cursor: pointer;
+  cursor: default;
   padding: 0 4px;
   font-size: 0.95em;
 }
@@ -151,7 +158,8 @@ tr.entry-row td {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
+
+  cursor: pointer;  width: 34px;
   height: 34px;
   border-radius: 50%;
   border: 2px solid #244b79;
@@ -267,6 +275,9 @@ let selYear = now.getFullYear();
 let selDays = 0;
 let holidays = {};
 
+// Erkennung, ob das Gerät ein Touch-Gerät (Smartphone/Tablet) ist.
+const isTouchDevice = ("ontouchstart" in window) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
+
 // --- Hilfsfunktionen Datum ---
 function daysInMonth(y, m){ return new Date(y, m+1, 0).getDate(); }
 
@@ -322,6 +333,47 @@ function checkInput(input){
   if(!input) return;
   if(input.value === "") input.classList.add("empty-input");
   else input.classList.remove("empty-input");
+
+  const row = input.closest("tr.entry-row");
+
+  // Wenn Betrag 1 geändert wird und jetzt einen Wert hat,
+  // einen evtl. vorhandenen Hinweis bei Betrag 2 in derselben Zeile ausblenden.
+  if (row && input.classList.contains("amount1") && input.value !== "") {
+    const wrapper2 = row.querySelector(".amount2-wrapper");
+    if (wrapper2) {
+      const hint = wrapper2.querySelector(".amount-error-hint");
+      if (hint) hint.remove();
+    }
+  }
+
+  // Zusätzliche Plausibilitätsprüfung: Wenn in Betrag 2 ein Wert
+  // eingegeben wird, aber Betrag 1 in derselben Zeile leer ist,
+  // einen optischen Hinweis unter dem Feld anzeigen und die Eingabe
+  // in Betrag 2 zurücknehmen.
+  if (row && input.classList.contains("amount2") && input.value !== "") {
+    const a1 = row.querySelector(".amount1");
+    if (a1 && !a1.value) {
+      const wrapper2 = row.querySelector(".amount2-wrapper");
+      if (wrapper2) {
+        let hint = wrapper2.querySelector(".amount-error-hint");
+        if (!hint) {
+          hint = document.createElement("div");
+          hint.className = "amount-error-hint";
+          wrapper2.appendChild(hint);
+        }
+        hint.textContent = "Bitte zuerst Betrag 1 eingeben.";
+      }
+      input.value = "";
+      input.classList.add("empty-input");
+      const day = typeof getDayFromEntryRow === "function"
+        ? getDayFromEntryRow(row)
+        : null;
+      if (day != null) {
+        updateDay(day);
+      }
+      a1.focus();
+    }
+  }
 }
 
 function toggleAmount2(btn, day){
@@ -436,6 +488,9 @@ function handleEnter(e){
 // Betragsfeld eines Tages verlässt und dort ein Wert steht, wird automatisch
 // eine neue Zeile für diesen Tag angelegt.
 function handleExit(e){
+  // Fallback nur auf Touch-Geräten aktivieren, damit auf Desktop
+  // ein Mausklick auf eine freie Stelle keine neue, leere Zeile erzeugt.
+  if (!isTouchDevice) return;
   const input = e.target;
   const currentRow = input.closest("tr.entry-row");
   if(!currentRow) return;
@@ -545,6 +600,28 @@ function dayHasAnyEntry(day) {
     }
   }
   return false;
+}
+
+function hasAnyDataInMonth() {
+  for (let d = 1; d <= selDays; d++) {
+    if (dayHasAnyEntry(d)) return true;
+  }
+  return false;
+}
+
+function updateBackArrowLabel() {
+  const wrapper = document.querySelector('.scroll-back-wrapper');
+  if (!wrapper) return;
+  const textSpan = wrapper.querySelector('.scroll-text');
+  if (!textSpan) return;
+
+  if (hasAnyDataInMonth()) {
+    textSpan.textContent = " zum letzten Eintrag";
+    wrapper.title = "Zum letzten Eintrag springen";
+  } else {
+    textSpan.textContent = " zurück zum Start";
+    wrapper.title = "Zurück zum Start";
+  }
 }
 
 let lastMissingDay = null;
@@ -687,8 +764,8 @@ function buildTable(){
         <tr class="day-summary">
           <td></td><td></td>
           <td></td>
-          <td id="sum-${day}">0.00</td>
-          <td id="cnt-${day}">0</td>
+          <td id="sum-${day}"></td>
+          <td id="cnt-${day}"></td>
         </tr>
         `;
     } else if(isWeekend){
@@ -700,8 +777,8 @@ function buildTable(){
         <tr class="day-summary">
           <td></td><td></td>
           <td></td>
-          <td id="sum-${day}">0.00</td>
-          <td id="cnt-${day}">0</td>
+          <td id="sum-${day}"></td>
+          <td id="cnt-${day}"></td>
         </tr>
         `;
     } else if(isFree){
@@ -719,8 +796,8 @@ function buildTable(){
         <tr class="day-summary">
           <td></td><td></td>
           <td></td>
-          <td id="sum-${day}">0.00</td>
-          <td id="cnt-${day}">0</td>
+          <td id="sum-${day}"></td>
+          <td id="cnt-${day}"></td>
         </tr>
         `;
     } else {
@@ -734,14 +811,14 @@ function buildTable(){
             </div>
             <button type="button" class="toggle-amount2" style="display:none;" onclick="toggleAmount2(this, ${day})">+ Betrag 2</button>
           </td>
-          <td class="scroll-to-summary" onclick="scrollToTotals()"></td>
+          <td class="scroll-to-summary"></td>
           <td></td>
         </tr>
         <tr class="day-summary">
           <td></td><td></td>
-          <td class="scroll-to-summary" onclick="scrollToTotals()"></td>
-          <td id="sum-${day}">0.00</td>
-          <td id="cnt-${day}">0</td>
+          <td class="scroll-to-summary"></td>
+          <td id="sum-${day}"></td>
+          <td id="cnt-${day}"></td>
         </tr>
         `;
     }
@@ -762,7 +839,7 @@ function addRow(day){
       </div>
       <button type="button" class="toggle-amount2" style="display:none;" onclick="toggleAmount2(this, ${day})">+ Betrag 2</button>
     </td>
-    <td class="scroll-to-summary" onclick="scrollToTotals()"></td>
+    <td class="scroll-to-summary"></td>
     <td></td>`;
   const summary = tb.querySelector("tr.day-summary");
   if(summary){
@@ -792,8 +869,8 @@ function updateDay(day){
     if(a1 > 0 || a2 > 0) customers++;
     sum += a1 + a2;
   });
-  document.getElementById("sum-" + day).innerText = sum.toFixed(2);
-  document.getElementById("cnt-" + day).innerText = customers;
+  document.getElementById("sum-" + day).innerText = sum > 0 ? sum.toFixed(2) : "";
+  document.getElementById("cnt-" + day).innerText = customers > 0 ? customers : "";
 
   saveDay(day);
   updateTotals();
@@ -892,6 +969,9 @@ function updateTotals(){
   const net = withTip / 1.19;
   document.getElementById("net-total").innerText = net.toFixed(2);
   document.getElementById("tax-total").innerText = (withTip - net).toFixed(2);
+
+  // Beschriftung des Zurück-Pfeils abhängig davon, ob Daten vorhanden sind
+  updateBackArrowLabel();
 }
 
 // JSON Export / Import
@@ -1075,7 +1155,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V118</h1>
+<h1>Einnahmen V127</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span>
@@ -1112,7 +1192,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <button onclick="document.getElementById('data-file-input').click()" style="margin-left:10px;">Datei laden</button>
 <div style="display:inline-block; margin-left:10px;">
   <button onclick="clearAllData()">Alle Daten löschen</button><br/>
-  <span class="scroll-back-wrapper" onclick="scrollBackToLastEntry()" title="Zum letzten Eintrag springen">
+  <span class="scroll-back-wrapper" title="Zum letzten Eintrag springen">
     <span class="scroll-circle">↑</span><span class="scroll-text"> zum letzten Eintrag</span>
   </span>
 </div>
@@ -1293,9 +1373,10 @@ document.addEventListener("input", function(e) {
 
 // Delegate click events for scroll-to-summary elements to smoothly scroll to the monthly totals
 document.addEventListener('click', function(event) {
-  const target = event.target;
-  if (target && target.classList.contains('scroll-to-summary')) {
-    // Prevent default anchor behaviour and scroll smoothly to the monthly overview
+  const circle = event.target.closest('.scroll-circle');
+  if (circle && circle.closest('.scroll-to-summary')) {
+    // Nur ein Klick direkt auf den Kreis-Pfeil in der Tageszeile
+    // scrollt zur Monatsübersicht.
     event.preventDefault();
     const totals = document.getElementById('onscreen-totals');
     if (totals) {
@@ -1304,7 +1385,54 @@ document.addEventListener('click', function(event) {
   }
 });
 
+
+document.addEventListener('click', function(event) {
+  // Nur ein Klick direkt auf den Kreis-Pfeil im unteren "Zurück"-Bereich
+  // soll scrollBackToLastEntry auslösen, nicht ein Klick daneben.
+  const backCircle = event.target.closest('.scroll-back-wrapper .scroll-circle');
+  if (backCircle) {
+    event.preventDefault();
+    scrollBackToLastEntry();
+  }
+});
+
 // Keep track of which entry row currently holds the scroll indicator
+
+// Hilfsfunktion: Liefert die Tagesnummer (1..31) für eine Eintragszeile
+// oder null, falls die Zeile keinem Tag zugeordnet werden kann.
+function getDayFromEntryRow(row) {
+  if (!row) return null;
+  const tbody = row.closest("tbody[id^='day-']");
+  if (!tbody || !tbody.id) return null;
+  const parts = tbody.id.split("-");
+  if (parts.length < 2) return null;
+  const day = parseInt(parts[1], 10);
+  return isNaN(day) ? null : day;
+}
+
+// Entfernt die letzte Eintragszeile eines Tages, falls sie komplett leer ist
+// (weder Betrag 1 noch Betrag 2) und es noch mindestens eine weitere Zeile
+// in diesem Tag gibt. Dadurch verschwinden unbenutzte, per Enter erzeugte
+// Zusatzzeilen automatisch, sobald im nächsten Tag weitergearbeitet wird.
+function removeTrailingEmptyRow(day) {
+  if (day == null) return;
+  const tbody = document.getElementById("day-" + day);
+  if (!tbody) return;
+  const rows = tbody.querySelectorAll("tr.entry-row");
+  if (rows.length <= 1) return; // mindestens eine Zeile pro Tag behalten
+
+  const lastRow = rows[rows.length - 1];
+  const a1 = lastRow.querySelector(".amount1");
+  const a2 = lastRow.querySelector(".amount2");
+  const hasValue = (a1 && a1.value !== "") || (a2 && a2.value !== "");
+  if (!hasValue) {
+    lastRow.remove();
+    updateDay(day);
+  }
+}
+
+let lastFocusedDay = null;
+
 let currentScrollRow = null;
 
 /**
@@ -1340,7 +1468,16 @@ function updateScrollArrow(row) {
 document.addEventListener('focusin', function(e) {
   if (e.target && (e.target.classList.contains('amount1') || e.target.classList.contains('amount2'))) {
     const row = e.target.closest('tr.entry-row');
-    if (row) updateScrollArrow(row);
+    if (row) {
+      const day = getDayFromEntryRow(row);
+      // Wenn von einem Tag zu einem anderen gewechselt wird, ggf. letzte
+      // leere Zusatzzeile im vorherigen Tag entfernen.
+      if (lastFocusedDay !== null && day !== null && day !== lastFocusedDay) {
+        removeTrailingEmptyRow(lastFocusedDay);
+      }
+      lastFocusedDay = day;
+      updateScrollArrow(row);
+    }
   }
 });
 
@@ -1354,9 +1491,13 @@ function scrollToTotals() {
 
 // Scrollt zur zuletzt bearbeiteten Eintragszeile (falls vorhanden)
 function scrollBackToLastEntry() {
-  // Verwende die globale Referenz auf die letzte bearbeitete Eintragszeile,
-  // um zu dieser zu scrollen. Wir berechnen eine Zielposition, damit die
-  // Zeile möglichst mittig im sichtbaren Bereich steht.
+  // Wenn keine Daten vorhanden sind, ganz nach oben zum Seitenanfang scrollen.
+  if (!hasAnyDataInMonth()) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  // Ansonsten wie bisher zur zuletzt bearbeiteten Eintragszeile scrollen.
   if (typeof currentScrollRow !== 'undefined' && currentScrollRow) {
     const rect = currentScrollRow.getBoundingClientRect();
     const rowTop = rect.top + window.pageYOffset;
