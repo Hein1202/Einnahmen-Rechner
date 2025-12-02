@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V137</title>
+<title>Einnahmen V138</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -1096,12 +1096,64 @@ function importJSON(ev){
 
 // Alle gespeicherten Daten löschen
 function clearAllData(){
-  Object.keys(localStorage).forEach(k=>{
-    if(k.startsWith("day-")||k.startsWith("cf-")||k==="totalTip") localStorage.removeItem(k);
-  });
-  alert("Alle Daten gelöscht");
+  // Hinweis mit Backup-Info und Bezug auf den aktuellen Monat
+  const monthLabel = (selMonth + 1).toString().padStart(2, "0") + "." + selYear;
+  const confirmMsg =
+    "Es wird jetzt eine Sicherungsdatei für den aktuell ausgewählten Monat (" + monthLabel + ") erstellt,\n" +
+    "und anschließend werden alle Daten dieses Monats gelöscht.\n\n" +
+    "Fortfahren?";
+
+  if (!confirm(confirmMsg)) {
+    return;
+  }
+
+  // Zuerst automatische Sicherung des aktuellen Monats als JSON
+  const data = {
+    year: selYear,
+    month: selMonth,
+    days: {},
+    free: {},
+    totalTip: localStorage.getItem("totalTip") || ""
+  };
+
+  for (let d = 1; d <= selDays; d++) {
+    const key = dayKey(d);
+    const raw = localStorage.getItem(key);
+    if (raw) data.days[key] = JSON.parse(raw);
+
+    const cf = "cf-" + selYear + "-" + selMonth + "-" + d;
+    const freeVal = localStorage.getItem(cf);
+    if (freeVal) data.free[cf] = freeVal;
+  }
+
+  const backupName = "backup_einnahmen_" +
+    selYear + "-" + String(selMonth + 1).padStart(2, "0") + ".json";
+
+  try {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = backupName;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.error("Backup konnte nicht erstellt werden:", e);
+  }
+
+  // Danach nur die Daten des aktuellen Monats aus dem Speicher entfernen
+  for (let d = 1; d <= selDays; d++) {
+    const key = dayKey(d);
+    localStorage.removeItem(key);
+    const cf = "cf-" + selYear + "-" + selMonth + "-" + d;
+    localStorage.removeItem(cf);
+  }
+  localStorage.removeItem("totalTip");
+
+  alert("Backup erstellt. Alle Daten für den Monat " + monthLabel + " wurden gelöscht.");
   location.reload();
 }
+
 
 // CSV Export
 function exportCSV(){
@@ -1207,7 +1259,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V137</h1>
+<h1>Einnahmen V138</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span>
