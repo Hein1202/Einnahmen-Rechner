@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V152</title>
+<title>Einnahmen V154</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -945,6 +945,11 @@ function dayKey(day){
   return "day-" + selYear + "-" + selMonth + "-" + day;
 }
 
+// Monatsspezifischer Schlüssel für Trinkgeld
+function tipKey(){
+  return "totalTip-" + selYear + "-" + selMonth;
+}
+
 // Tag neu berechnen und speichern
 function updateDay(day){
   let sum = 0;
@@ -987,11 +992,18 @@ function saveDay(day){
 function loadDay(day){
   const raw = localStorage.getItem(dayKey(day));
   if(!raw) return;
-  const rows = JSON.parse(raw);
+  let rows;
+  try {
+    rows = JSON.parse(raw);
+  } catch (err) {
+    console.warn("Ungültige gespeicherte Daten für ", dayKey(day), err);
+    // Daten nicht laden (Tip & Monat bleiben trotzdem korrekt)
+    return;
+  }
+  if(!Array.isArray(rows)) return;
   const tb = document.getElementById("day-" + day);
   if(!tb) return;
-
-  rows.forEach((r, idx) => {
+rows.forEach((r, idx) => {
     if(idx > 0) addRow(day);
     const row = tb.querySelectorAll(".entry-row")[idx];
     const a1 = row.querySelector(".amount1");
@@ -1021,16 +1033,24 @@ function loadDay(day){
 }
 
 function loadAllDays(){
-  for(let d = 1; d <= selDays; d++){
-    loadDay(d);
-  }
+  // Wichtig: Trinkgeld immer zuerst monatsbezogen laden,
+  // damit es NICHT „mitwandert“, falls es beim Laden einzelner Tage Fehler gibt.
   const tip = document.getElementById("total-tip");
-  tip.value = localStorage.getItem("totalTip") || "";
-  checkInput(tip);
+  if (tip) {
+    tip.value = localStorage.getItem(tipKey()) || "";
+    checkInput(tip);
+  }
+
+  for(let d = 1; d <= selDays; d++){
+    try {
+      loadDay(d);
+    } catch (err) {
+      console.warn("Fehler beim Laden von Tag "+d, err);
+    }
+  }
   // Nach dem Laden aller Tage Buttons für Betrag 2 korrekt initialisieren
   updateAmount2ButtonsVisibility();
 }
-
 // Gesamtsummen
 function updateTotals(){
   let total = 0;
@@ -1047,7 +1067,7 @@ function updateTotals(){
 
   const tipInput = document.getElementById("total-tip");
   const tip = parseFloat(tipInput.value) || 0;
-  localStorage.setItem("totalTip", tip);
+  localStorage.setItem(tipKey(), tip);
 
   const withTip = total + tip;
   document.getElementById("with-tip").innerText = withTip.toFixed(2);
@@ -1067,7 +1087,7 @@ function exportJSON(){
     month: selMonth,
     days: {},
     free: {},
-    totalTip: localStorage.getItem("totalTip") || ""
+    totalTip: localStorage.getItem(tipKey()) || ""
   };
 
   for(let d = 1; d <= selDays; d++){
@@ -1138,7 +1158,7 @@ function importJSON(ev){
         }
       }
       if(data.totalTip !== undefined){
-        localStorage.setItem("totalTip", data.totalTip);
+        localStorage.setItem(tipKey(), data.totalTip);
       }
       alert("Import erfolgreich. Seite wird neu geladen.");
       location.reload();
@@ -1168,7 +1188,7 @@ function clearAllData(){
     month: selMonth,
     days: {},
     free: {},
-    totalTip: localStorage.getItem("totalTip") || ""
+    totalTip: localStorage.getItem(tipKey()) || ""
   };
 
   for (let d = 1; d <= selDays; d++) {
@@ -1203,7 +1223,7 @@ function clearAllData(){
     const cf = "cf-" + selYear + "-" + selMonth + "-" + d;
     localStorage.removeItem(cf);
   }
-  localStorage.removeItem("totalTip");
+  localStorage.removeItem(tipKey());
 
   alert("Backup erstellt. Alle Daten für den Monat " + monthLabel + " wurden gelöscht.");
   location.reload();
@@ -1314,7 +1334,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V152</h1>
+<h1>Einnahmen V154</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span><span id="month-lock-toggle" onclick="toggleLock()" style="cursor:pointer; font-size: 1.4em; margin-left: 10px;" title="Monat bearbeiten/sperren">🔓</span>
@@ -1909,7 +1929,7 @@ exportJSON = function () {
     month: selMonth,
     days: {},
     free: {},
-    totalTip: localStorage.getItem("totalTip") || "",
+    totalTip: localStorage.getItem(tipKey()) || "",
     locked: isMonthLocked(selYear, selMonth) ? true : false
   };
 
@@ -1967,7 +1987,7 @@ importJSON = function (ev) {
         }
       }
       if(data.totalTip !== undefined){
-        localStorage.setItem("totalTip", data.totalTip);
+        localStorage.setItem(tipKey(), data.totalTip);
       }
       if(data.locked === true){
         localStorage.setItem(`locked-${data.year}-${data.month}`, "1");
