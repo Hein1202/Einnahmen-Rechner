@@ -1,0 +1,2007 @@
+<!DOCTYPE html>
+
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<title>Einnahmen V154</title>
+<style>
+body { margin:0; padding:0; }
+.container { max-width:600px; margin:0 auto; background:white; padding:20px; }
+h1 { margin-top:0; }
+
+#selected-month {
+  font-weight:bold;
+  font-size:1.6em;
+  color:#b30000;
+  background:#ffe5e5;
+  padding:5px 12px;
+  border-radius:8px;
+}
+
+#month-nav { font-size:1.4em; margin:10px 0; display:flex; align-items:center; justify-content:space-between; }
+.nav { cursor:pointer; font-weight:bold; padding:0 10px; }
+
+table { width:100%; border-collapse:collapse; background:#f5f5dc; }
+th, td { border:1px solid black; padding:6px; text-align:center; }
+
+/* Grundlegendes Styling für Betragsfelder und Trinkgeld */
+.amount1, .amount2, #total-tip {
+  box-sizing:border-box;
+  padding:8px;
+  border:1px solid black;
+  text-align:center;
+}
+
+/* Breite der Eingabe für Betrag 1 reduzieren und zentrieren */
+
+.amount1 {
+  /* Verringern Sie die Breite der Betragsfelder, sodass sie schmaler wirken. */
+  /* 60 % der Zellenbreite in Kombination mit einer maximalen Breite von 120 px
+     ist kompakt, sodass längere Texte dennoch sichtbar bleiben. */
+  width: 60%;
+  max-width: 120px;
+  display: block;
+  margin: 0 auto;
+}
+
+/* Zweites Betragsfeld mit gleicher Breite wie Betrag 1 */
+.amount2 {
+  width: 60%;
+  max-width: 120px;
+  min-width: 60px;
+  display: block;
+  margin: 0 auto; /* exakt gleiche vertikale Ausrichtung wie Betrag 1 */
+}
+
+/* Zellen der Eingabezeilen oben ausrichten, damit Betrag 1 und Betrag 2
+   (inkl. Button) bündig nebeneinander stehen. */
+tr.entry-row td {
+  vertical-align: top;
+}
+
+/* Wrapper von Betrag 2 kompakt halten und neben Betrag 1 platzieren */
+.amount2-wrapper {
+  display: inline-block;
+  vertical-align: top;
+  margin: 0;
+  padding: 0;
+}
+.amount1-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.amount1-wrapper input.amount1 {
+  min-width: 0;
+  padding-right: 4px;
+}
+
+/* Standardbetrag-Button links neben dem Feld */
+.std-amount-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid #999;
+  background: #f7f7f7;
+  font-size: 0.7em;
+  line-height: 1;
+  cursor: pointer;
+  display: none; /* wird nur bei aktiver Zeile angezeigt */
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.std-amount-btn.visible {
+  display: inline-flex;
+}
+
+.std-amount-btn:hover {
+  background: #e0e0e0;
+}
+
+.copy-prev-amount {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid #999;
+  background: #f0f0f0;
+  font-size: 0.8em;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+.copy-prev-amount:hover {
+  opacity: 1;
+  background: #e0e0e0;
+}
+
+
+.amount-error-hint {
+  margin-top: 2px;
+  font-size: 0.8em;
+  color: #b30000;
+}
+
+
+/* Toggle-Button direkt unter dem zweiten Feld, ohne extra Abstand nach oben */
+.toggle-amount2 {
+  display: inline-block;
+  vertical-align: top;
+  margin-top: 0;
+  font-size: 0.8em;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.empty-input { background-color:lightgray; }
+.amount1:not(.empty-input),
+.amount2:not(.empty-input),
+#total-tip:not(.empty-input) {
+  font-weight: bold;
+}
+
+.weekend, .holiday, .customfree {
+  background:#ddd;
+  font-weight:bold;
+  font-style:italic;
+}
+
+/* Spezielle Farben für Beschriftung von Urlaub und Krankheit */
+.customfree .day-cell small .label-urlaub {
+  color: #2a8f3a;
+}
+.customfree .day-cell small .label-krank {
+  color: #3a5f85;
+}
+.day-cell { cursor:pointer; font-weight:bold; }
+
+/* Sonntage und Feiertage: Tageszahl + Text in Rot darstellen */
+.weekend.sunday .day-cell,
+.weekend.sunday .day-cell small,
+.holiday .day-cell,
+.holiday .day-cell small {
+  color: #b30000;
+}
+
+/* Druckmodus optimieren */
+@media print {
+  button, input[type=file] {
+    display:none !important;
+  }
+  body {
+    color:black !important;
+    background:white !important;
+  }
+  #selected-month {
+    background:white !important;
+    color:black !important;
+  }
+}
+
+
+
+
+
+.nav-btn {
+  font-size: 1.4em;
+  padding: 6px 12px;
+  margin: 0 10px;
+  cursor: pointer;
+  font-weight: bold;
+  border: 2px solid #444;
+  background: #eee;
+  border-radius: 6px;
+}
+
+
+/* Scroll button to jump from a day to the monthly overview */
+/* Base cell style: empty by default */
+.scroll-to-summary {
+  cursor: default;
+  padding: 0 4px;
+  font-size: 0.95em;
+}
+
+/* Kreis mit Pfeil */
+.scroll-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid #244b79;
+  background: #cfe2ff; /* leichtes Blau */
+  font-size: 1.3em;
+  line-height: 1;
+  font-weight: bold;
+}
+
+/* Text neben dem Kreis */
+.scroll-text {
+  margin-left: 4px;
+  white-space: nowrap;
+}
+.scroll-back-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  margin-top: 4px;
+}
+.missing-day-hint-inline {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 2px solid #b30000;
+  background: #ffecec;
+  color: #b30000;
+  font-weight: bold;
+  border-radius: 6px;
+  font-size: 0.9em;
+}
+
+
+
+/* Highlight auf dem Kreis bei Hover */
+.scroll-to-summary:hover .scroll-circle {
+  background: #d8eaff;
+}
+
+/* Entferne Auf-/Ab-Pfeile (Spinner) in number-Feldern, um den Inhalt komplett anzuzeigen */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield; /* für Firefox */
+}
+
+
+.bg-blue   { background-color: #e0f0ff; }
+.bg-green  { background-color: #e8ffe8; }
+.bg-yellow { background-color: #fffbe0; }
+.bg-dark   { background-color: #1e1e1e; color: white; }
+
+.bg-darkblue { background-color: #b0c4de; } /* steelblue/light slate blue */
+
+/* Äußerer Rahmen pro Tag */
+tbody[id^="day-"] {
+  border: 2px solid #333;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+/* Keine Rahmen innerhalb eines Tagesblocks */
+tbody[id^="day-"] td,
+tbody[id^="day-"] tr {
+  border: none !important;
+  outline: none !important;
+}
+
+/* Inputs bleiben sichtbar, aber dezent */
+tbody[id^="day-"] input {
+  border: 1px solid #ccc;
+}
+
+
+/* Größere Darstellung der Tageszahlen (erste Spalte) */
+tbody[id^="day-"] tr:first-child td:first-child {
+  font-size: 1.4em;
+  font-weight: bold;
+}
+
+
+/* Auch Tageszahlen in freien Tagen (z. B. Samstag, Sonntag, Feiertag) größer darstellen */
+tr.frei td span.fett {
+  font-size: 1.4em;
+}
+
+
+/* Auch reguläre Tageszahlen größer darstellen */
+tbody[id^="day-"] tr td:first-child {
+  font-size: 1.4em;
+  font-weight: bold;
+}
+
+
+/* Tagessumme (rechts unten) und Kundenanzahl fett */
+tbody[id^="day-"] tr:last-child td:last-child,
+tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
+  font-weight: bold;
+}
+
+</style>
+<script>
+// --- Globale Variablen ---
+const monthNames = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+let now = new Date();
+let selMonth = now.getMonth();
+let selYear = now.getFullYear();
+let selDays = 0;
+let holidays = {};
+
+// Erkennung, ob das Gerät ein Touch-Gerät (Smartphone/Tablet) ist.
+const isTouchDevice = ("ontouchstart" in window) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
+
+// --- Hilfsfunktionen Datum ---
+function daysInMonth(y, m){ return new Date(y, m+1, 0).getDate(); }
+
+function fmt(d){
+  return d.getFullYear() + "-" +
+         String(d.getMonth()+1).padStart(2,"0") + "-" +
+         String(d.getDate()).padStart(2,"0");
+}
+function addDays(d, x){
+  let n = new Date(d);
+  n.setDate(n.getDate() + x);
+  return n;
+}
+
+// Ostersonntag nach Gauß
+function calcEaster(Y){
+  let a = Y % 19;
+  let b = Math.floor(Y / 100);
+  let c = Y % 100;
+  let d = Math.floor(b / 4);
+  let e = b % 4;
+  let f = Math.floor((b + 8) / 25);
+  let g = Math.floor((b - f + 1) / 3);
+  let h = (19*a + b - d - g + 15) % 30;
+  let i = Math.floor(c / 4);
+  let k = c % 4;
+  let l = (32 + 2*e + 2*i - h - k) % 7;
+  let m = Math.floor((a + 11*h + 22*l) / 451);
+  let month = Math.floor((h + l - 7*m + 114) / 31);
+  let day = ((h + l - 7*m + 114) % 31) + 1;
+  return new Date(Y, month - 1, day);
+}
+
+function getNRWHolidays(year){
+  let easter = calcEaster(year);
+  let H = {};
+  H[fmt(new Date(year,0,1))]  = "Neujahr";
+  H[fmt(new Date(year,4,1))]  = "Tag der Arbeit";
+  H[fmt(new Date(year,9,3))]  = "Tag der Deutschen Einheit";
+  H[fmt(new Date(year,11,25))] = "1. Weihnachtstag";
+  H[fmt(new Date(year,11,26))] = "2. Weihnachtstag";
+  H[fmt(new Date(year,10,1))] = "Allerheiligen";
+  H[fmt(addDays(easter,-2))]  = "Karfreitag";
+  H[fmt(addDays(easter, 1))]  = "Ostermontag";
+  H[fmt(addDays(easter,39))]  = "Christi Himmelfahrt";
+  H[fmt(addDays(easter,50))]  = "Pfingstmontag";
+  H[fmt(addDays(easter,60))]  = "Fronleichnam";
+  return H;
+}
+
+// --- Design-Helfer ---
+function checkInput(input){
+  if(!input) return;
+  if(input.value === "") input.classList.add("empty-input");
+  else input.classList.remove("empty-input");
+
+  const row = input.closest("tr.entry-row");
+
+  // Wenn Betrag 1 geändert wird und jetzt einen Wert hat,
+  // einen evtl. vorhandenen Hinweis bei Betrag 2 in derselben Zeile ausblenden.
+  if (row && input.classList.contains("amount1") && input.value !== "") {
+    const wrapper2 = row.querySelector(".amount2-wrapper");
+    if (wrapper2) {
+      const hint = wrapper2.querySelector(".amount-error-hint");
+      if (hint) hint.remove();
+    }
+  }
+
+  // Zusätzliche Plausibilitätsprüfung: Wenn in Betrag 2 ein Wert
+  // eingegeben wird, aber Betrag 1 in derselben Zeile leer ist,
+  // einen optischen Hinweis unter dem Feld anzeigen und die Eingabe
+  // in Betrag 2 zurücknehmen.
+  if (row && input.classList.contains("amount2") && input.value !== "") {
+    const a1 = row.querySelector(".amount1");
+    if (a1 && !a1.value) {
+      const wrapper2 = row.querySelector(".amount2-wrapper");
+      if (wrapper2) {
+        let hint = wrapper2.querySelector(".amount-error-hint");
+        if (!hint) {
+          hint = document.createElement("div");
+          hint.className = "amount-error-hint";
+          wrapper2.appendChild(hint);
+        }
+        hint.textContent = "Bitte zuerst Betrag 1 eingeben.";
+      }
+      input.value = "";
+      input.classList.add("empty-input");
+      const day = typeof getDayFromEntryRow === "function"
+        ? getDayFromEntryRow(row)
+        : null;
+      if (day != null) {
+        updateDay(day);
+      }
+      a1.focus();
+    }
+  }
+}
+
+function toggleAmount2(btn, day){
+  const wrapper = btn.parentElement.querySelector(".amount2-wrapper");
+  const input = wrapper.querySelector(".amount2");
+  if(wrapper.style.display === "none" || wrapper.style.display === ""){
+    wrapper.style.display = "block";
+    btn.textContent = "− Betrag 2";
+  } else {
+    wrapper.style.display = "none";
+    if (input) {
+      input.value = "";
+      checkInput(input);
+    }
+    btn.textContent = "+ Betrag 2";
+    updateDay(day);
+  }
+  // Nach Änderung Betrag-2-Status Buttons neu bewerten
+  updateAmount2ButtonsVisibility();
+}
+
+
+let currentAmount1Row = null;
+
+// Wird aufgerufen, wenn ein Betrag-1-Feld den Fokus erhält.
+// Merkt sich die aktuelle Zeile und aktualisiert die Sichtbarkeit
+// der "+ Betrag 2"-Buttons.
+function setCurrentAmount1Row(input){
+  const row = input.closest("tr.entry-row");
+  currentAmount1Row = row || null;
+  updateAmount2ButtonsVisibility();
+}
+
+// Aktualisiert die Sichtbarkeit aller "+ Betrag 2"-Buttons.
+// Grundlogik:
+//  - Wenn in einer Zeile Betrag 2 bereits gefüllt/aktiv ist → Button immer sichtbar.
+//  - Sonst: Button nur in der aktuell fokussierten Zeile sichtbar.
+function updateAmount2ButtonsVisibility(){
+  const rows = document.querySelectorAll("tr.entry-row");
+  rows.forEach(row => {
+    const btn = row.querySelector(".toggle-amount2");
+    const wrapper = row.querySelector(".amount2-wrapper");
+    const a2 = row.querySelector(".amount2");
+    const copyBtn = row.querySelector(".copy-prev-amount");
+    const stdBtn = row.querySelector(".std-amount-btn");
+
+    if (btn) {
+      const hasAmount2 = a2 && a2.value !== "";
+      const wrapperVisible = wrapper && wrapper.style.display !== "none" && wrapper.style.display !== "";
+
+      if (hasAmount2 || wrapperVisible) {
+        // Betrag 2 ist aktiv → Button (meist "− Betrag 2") immer anzeigen
+        btn.style.display = "inline-block";
+      } else if (row === currentAmount1Row) {
+        // Aktuelle Zeile ohne Betrag 2 → "+ Betrag 2" anzeigen
+        btn.style.display = "inline-block";
+      } else {
+        // Andere Zeilen ohne Betrag 2 → Button verbergen
+        btn.style.display = "none";
+      }
+    }
+
+    // Wiederhol-Button (↺) nur in der aktuell aktiven Zeile anzeigen.
+    if (copyBtn) {
+      const allRows = Array.from(document.querySelectorAll('tbody[id^="day-"] tr.entry-row'));
+      const isFirstGlobal = allRows.length > 0 && allRows[0] === row;
+
+      if (row === currentAmount1Row) {
+        if (!isFirstGlobal) copyBtn.style.display = "inline-block"; else copyBtn.style.display = "none";
+      } else {
+        copyBtn.style.display = "none";
+      }
+    }
+
+    // Standardbetrag-Button nur in der aktuell aktiven Zeile anzeigen.
+    if (stdBtn) {
+      if (row === currentAmount1Row) {
+        stdBtn.classList.add("visible");
+      } else {
+        stdBtn.classList.remove("visible");
+      }
+    }
+  });
+}
+
+
+function handleEnter(e){
+  // Auf Desktop funktioniert Enter normal, auf vielen Smartphones sendet die
+  // Action-Taste der Bildschirmtastatur jedoch "Next"/Tab. Wir behandeln
+  // deshalb sowohl Enter als auch Tab (keyCode 13 bzw. 9) als Auslöser.
+  const k = e.key;
+  const code = e.keyCode || e.which;
+  const isActionKey = (k === "Enter" || k === "Tab" || code === 13 || code === 9);
+
+  if(isActionKey){
+    e.preventDefault();
+    const currentRow = e.target.closest("tr.entry-row");
+    if(!currentRow) return;
+    const tbody = currentRow.parentElement;
+    if(!tbody || !tbody.id || !tbody.id.startsWith("day-")) return;
+
+    const rows = Array.from(tbody.querySelectorAll("tr.entry-row"));
+    const idx = rows.indexOf(currentRow);
+    if(idx === -1) return;
+
+    // Wenn es eine weitere Zeile im selben Tag gibt → dorthin springen
+    if(idx < rows.length - 1){
+      const nextRow = rows[idx + 1];
+      const nextInput = nextRow.querySelector("input.amount1");
+      if(nextInput){
+        nextInput.focus();
+        if(typeof nextInput.select === "function"){
+          nextInput.select();
+        }
+      }
+    } else {
+      // Letzte Zeile dieses Tages: neue Zeile anlegen und dorthin springen
+      const dayStr = tbody.id.split("-")[1];
+      const day = parseInt(dayStr, 10);
+      if(!isNaN(day)){
+        addRow(day);
+        const newRows = tbody.querySelectorAll("tr.entry-row");
+        const lastRow = newRows[newRows.length - 1];
+        const input = lastRow.querySelector("input.amount1");
+        if(input){
+          input.focus();
+          if(typeof input.select === "function"){
+            input.select();
+          }
+        }
+      }
+    }
+  }
+}
+
+// Fallback speziell für Smartphones: Wenn der Benutzer das letzte
+// Betragsfeld eines Tages verlässt und dort ein Wert steht, wird automatisch
+// eine neue Zeile für diesen Tag angelegt.
+function handleExit(e){
+  // Fallback nur auf Touch-Geräten aktivieren, damit auf Desktop
+  // ein Mausklick auf eine freie Stelle keine neue, leere Zeile erzeugt.
+  if (!isTouchDevice) return;
+  const input = e.target;
+  const currentRow = input.closest("tr.entry-row");
+  if(!currentRow) return;
+  const tbody = currentRow.parentElement;
+  if(!tbody || !tbody.id || !tbody.id.startsWith("day-")) return;
+
+  const rows = Array.from(tbody.querySelectorAll("tr.entry-row"));
+  const idx = rows.indexOf(currentRow);
+  if(idx === -1 || idx < rows.length - 1) return; // nicht letzte Zeile
+
+  const a1 = currentRow.querySelector("input.amount1");
+  const a2 = currentRow.querySelector("input.amount2");
+  const hasValue =
+    (a1 && a1.value !== "") ||
+    (a2 && a2.value !== "");
+  if(!hasValue) return; // Zeile leer → nichts tun
+
+  const dayStr = tbody.id.split("-")[1];
+  const day = parseInt(dayStr, 10);
+  if(isNaN(day)) return;
+
+  addRow(day);
+  const newRows = tbody.querySelectorAll("tr.entry-row");
+  const lastRow = newRows[newRows.length - 1];
+  const firstInput = lastRow.querySelector("input.amount1");
+  if(firstInput){
+    firstInput.focus();
+    if(typeof firstInput.select === "function"){
+      firstInput.select();
+    }
+  }
+}
+
+// Eigene freie Tage speichern / lesen. Bei einem Klick kann der Benutzer wählen,
+// ob der Tag als Urlaubstag oder Krankheitstag markiert werden soll. Bei erneutem
+// Klick wird die Markierung entfernt. Die Auswahl wird unter dem Schlüssel
+// "cf-YYYY-MM-DD" im localStorage gespeichert und der Wert gibt die Art des
+// freien Tages an ("urlaub" oder "krank").
+function toggleFreeDay(day){
+  const key = "cf-" + selYear + "-" + selMonth + "-" + day;
+  const current = localStorage.getItem(key);
+
+  let next;
+  if(current === null){
+    next = "urlaub";
+  } else if(current === "urlaub"){
+    next = "krank";
+  } else if(current === "krank"){
+    next = null;
+  }
+
+  if(next === null){
+    localStorage.removeItem(key);
+  } else {
+    localStorage.setItem(key, next);
+  }
+
+  updateMonth();  // neu aufbauen
+}
+
+// Liefert den Typ des eigenen freien Tages ("urlaub", "krank") oder null, wenn
+// der Tag kein eigener freier Tag ist.
+function getFreeDayType(day){
+  return localStorage.getItem("cf-" + selYear + "-" + selMonth + "-" + day);
+}
+
+// Prüft, ob der Tag als eigener freier Tag markiert ist (unabhängig vom Typ).
+function isFreeDay(day){
+  return getFreeDayType(day) !== null;
+}
+
+// Zusätzliche Helfer für die Erkennung fehlender Einträge im vorherigen Arbeitstag.
+
+// Prüft, ob ein bestimmter Tag (im aktuellen Monat) ein relevanter Arbeitstag ist,
+// d.h. kein Wochenende, kein Feiertag und kein als frei (Urlaub/Krank) markierter Tag.
+function isRelevantWorkday(day) {
+  if (day < 1 || day > selDays) return false;
+  const date = new Date(selYear, selMonth, day);
+  const weekday = date.toLocaleDateString("de-DE", { weekday: "long" }).toLowerCase();
+  if (weekday === "samstag" || weekday === "sonntag") return false;
+  const ds = fmt(date);
+  if (holidays && holidays[ds]) return false;
+  if (isFreeDay(day)) return false;
+  return true;
+}
+
+// Sucht den letzten relevanten Arbeitstag vor dem angegebenen Tag.
+function findPreviousWorkday(currentDay) {
+  for (let d = currentDay - 1; d >= 1; d--) {
+    if (isRelevantWorkday(d)) return d;
+  }
+  return null;
+}
+
+// Prüft, ob an dem angegebenen Tag mindestens ein Eintrag mit Betrag > 0 existiert.
+function dayHasAnyEntry(day) {
+  const tbody = document.getElementById("day-" + day);
+  if (!tbody) return false;
+  const rows = tbody.querySelectorAll("tr.entry-row");
+  for (const row of rows) {
+    const a1Str = row.querySelector(".amount1")?.value || "";
+    const a2Str = row.querySelector(".amount2")?.value || "";
+    const num1 = parseFloat(String(a1Str).replace(",", "."));
+    const num2 = parseFloat(String(a2Str).replace(",", "."));
+    if ((!isNaN(num1) && num1 > 0) || (!isNaN(num2) && num2 > 0)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function hasAnyDataInMonth() {
+  for (let d = 1; d <= selDays; d++) {
+    if (dayHasAnyEntry(d)) return true;
+  }
+  return false;
+}
+
+function updateBackArrowLabel() {
+  const wrapper = document.querySelector('.scroll-back-wrapper');
+  if (!wrapper) return;
+  const textSpan = wrapper.querySelector('.scroll-text');
+  if (!textSpan) return;
+
+  if (hasAnyDataInMonth()) {
+    textSpan.textContent = " zum letzten Eintrag";
+    wrapper.title = "Zum letzten Eintrag springen";
+  } else {
+    textSpan.textContent = " zurück zum Start";
+    wrapper.title = "Zurück zum Start";
+  }
+}
+
+let lastMissingDay = null;
+let lastMissingHintRow = null;
+
+// Zeigt einen Hinweis inline unter dem aktuellen Tag an, dass für einen
+// vorherigen Tag keine Einträge vorhanden sind und bietet an, diesen
+// als Urlaubstag / Krankheitstag zu markieren oder zu ihm zu springen.
+// missingDay  = der Tag, an dem keine Einträge vorhanden sind
+// currentDay  = der Tag, an dem gerade eine Eingabe vorgenommen wurde
+function showMissingDayHint(missingDay, currentDay) {
+  lastMissingDay = missingDay;
+
+  // vorhandenen Inline-Hinweis entfernen
+  hideMissingDayHint();
+
+  const currentTbody = document.getElementById("day-" + currentDay);
+  if (!currentTbody) return;
+
+  const dateStr = String(missingDay).padStart(2, "0") + "." + String(selMonth + 1).padStart(2, "0") + "." + selYear;
+
+  const tr = document.createElement("tr");
+  tr.className = "missing-day-hint-inline-row";
+  const td = document.createElement("td");
+  td.colSpan = 5;
+  td.innerHTML =
+    '<div class="missing-day-hint-inline">' +
+    'Hinweis: Am ' + dateStr + ' wurde kein Eintrag gemacht.<br/>' +
+    '<button type="button" onclick="markMissingDayAs(\'urlaub\')">Als Urlaubstag markieren</button> ' +
+    '<button type="button" onclick="markMissingDayAs(\'krank\')">Als Krankheitstag markieren</button>' +
+    '</div>';
+  tr.appendChild(td);
+
+  // Hinweis direkt vor der Tagessummen-Zeile einfügen, falls vorhanden
+  const summaryRow = currentTbody.querySelector("tr.day-summary");
+  if (summaryRow) {
+    currentTbody.insertBefore(tr, summaryRow);
+  } else {
+    currentTbody.appendChild(tr);
+  }
+
+  lastMissingHintRow = tr;
+}
+
+function hideMissingDayHint() {
+  if (lastMissingHintRow && lastMissingHintRow.parentNode) {
+    lastMissingHintRow.parentNode.removeChild(lastMissingHintRow);
+  }
+  lastMissingHintRow = null;
+}
+
+// Markiert den zuletzt gemeldeten fehlenden Tag als Urlaub oder Krank
+// und baut den Monat neu auf.
+function markMissingDayAs(type) {
+  if (!lastMissingDay) return;
+  const key = "cf-" + selYear + "-" + selMonth + "-" + lastMissingDay;
+  if (type === "urlaub" || type === "krank") {
+    localStorage.setItem(key, type);
+  }
+  hideMissingDayHint();
+  updateMonth();
+}
+
+// Scrollt zum zuletzt gemeldeten fehlenden Tag.
+function scrollToMissingDay() {
+  if (!lastMissingDay) return;
+  const tbody = document.getElementById("day-" + lastMissingDay);
+  if (!tbody) return;
+  const rect = tbody.getBoundingClientRect();
+  const target = rect.top + window.pageYOffset - 60;
+  window.scrollTo({ top: target < 0 ? 0 : target, behavior: "smooth" });
+}
+
+// Wird nach der Aktualisierung eines Tages aufgerufen, um zu prüfen,
+// ob der vorherige relevante Arbeitstag leer ist.
+function checkPreviousWorkdayForMissingEntries(day) {
+  if (day <= 1) return;
+  const prev = findPreviousWorkday(day);
+  if (!prev) return;
+  if (!dayHasAnyEntry(prev)) {
+    showMissingDayHint(prev, day);
+  } else if (lastMissingDay === prev) {
+    // Falls der vorherige Tag inzwischen Einträge hat, Hinweis ggf. ausblenden
+    hideMissingDayHint();
+  }
+}
+
+// Monatsnavigation
+function prevMonth(){
+  selMonth--;
+  if(selMonth < 0){ selMonth = 11; selYear--; }
+  updateMonth();
+}
+function nextMonth(){
+  selMonth++;
+  if(selMonth > 11){ selMonth = 0; selYear++; }
+  updateMonth();
+}
+
+function updateMonth(){
+  document.getElementById("selected-month").innerText =
+    monthNames[selMonth] + " " + selYear;
+
+  selDays = daysInMonth(selYear, selMonth);
+  holidays = getNRWHolidays(selYear);
+
+  buildTable();
+  loadAllDays();
+  updateTotals();
+}
+
+// Tabelle aufbauen
+function buildTable(){
+  const table = document.getElementById("main-table");
+  const tfoot = document.querySelector("tfoot");
+  document.querySelectorAll("tbody.dayblock").forEach(e => e.remove());
+
+  for(let day = 1; day <= selDays; day++){
+    const date = new Date(selYear, selMonth, day);
+    const weekday = date.toLocaleDateString("de-DE",{weekday:"long"}).toLowerCase();
+    const weekdayLabel = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+    const ds = fmt(date);
+    const isHoliday = (holidays[ds] != null);
+    const isWeekend = (weekday === "samstag" || weekday === "sonntag");
+    const isSunday  = (weekday === "sonntag");
+    // Den Typ des eigenen freien Tages ermitteln ("urlaub", "krank" oder null)
+    const freeType = getFreeDayType(day);
+    const isFree = freeType !== null;
+
+    let tb = document.createElement("tbody");
+    tb.classList.add("dayblock");
+    tb.id = "day-" + day;
+
+    if(isHoliday){
+      const holidayName = holidays[ds] || "Feiertag";
+      tb.innerHTML = `<tr class="holiday">
+        <td class="day-cell" onclick="toggleFreeDay(${day})">${day}<br><small>${weekdayLabel} – ${holidayName}</small></td>
+        <td colspan="4">Kein Arbeitstag</td>
+      </tr>
+        <tr class="day-summary">
+          <td></td><td></td>
+          <td></td>
+          <td id="sum-${day}"></td>
+          <td id="cnt-${day}"></td>
+        </tr>
+        `;
+    } else if(isWeekend){
+      const weekendClass = isSunday ? "weekend sunday" : "weekend";
+      tb.innerHTML = `<tr class="${weekendClass}">
+        <td class="day-cell" onclick="toggleFreeDay(${day})">${day}<br><small>${weekdayLabel}</small></td>
+        <td colspan="4">Kein Arbeitstag</td>
+      </tr>
+        <tr class="day-summary">
+          <td></td><td></td>
+          <td></td>
+          <td id="sum-${day}"></td>
+          <td id="cnt-${day}"></td>
+        </tr>
+        `;
+    } else if(isFree){
+      // Je nach Typ des eigenen freien Tages eine passende Beschriftung wählen
+      const label = freeType === "urlaub"
+        ? '<span class="label-urlaub">🌴 Urlaubstag</span>'
+        : (freeType === "krank"
+           ? '<span class="label-krank">🤒 Krankheitstag</span>'
+           : "Eigener freier Tag");
+      // Bei eigenen freien Tagen soll die Beschriftung "Kein Arbeitstag" entfallen.
+      tb.innerHTML = `<tr class="customfree">
+        <td class="day-cell" onclick="toggleFreeDay(${day})">${day}<br><small>${label}</small></td>
+        <td colspan="4"></td>
+      </tr>
+        <tr class="day-summary">
+          <td></td><td></td>
+          <td></td>
+          <td id="sum-${day}"></td>
+          <td id="cnt-${day}"></td>
+        </tr>
+        `;
+    } else {
+      tb.innerHTML = `
+        <tr class="entry-row">
+          <td class="day-cell" onclick="toggleFreeDay(${day})">${day}</td>
+          <td><div class="amount1-wrapper"><button type="button" class="std-amount-btn" onclick="setStandardAmountForRow(this, 33, ${day})" title="33 € einfügen">33</button><input class="amount1 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)" onblur="handleExit(event)"></div></td>
+          <td>
+            <div class="amount2-wrapper" style="display:none;">
+              <input class="amount2 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)" onblur="handleExit(event)">
+            </div>
+            <button type="button" class="toggle-amount2" style="display:none;" onclick="toggleAmount2(this, ${day})">+ Betrag 2</button>
+          </td>
+          <td class="scroll-to-summary"></td>
+          <td></td>
+        </tr>
+        <tr class="day-summary">
+          <td></td><td></td>
+          <td class="scroll-to-summary"></td>
+          <td id="sum-${day}"></td>
+          <td id="cnt-${day}"></td>
+        </tr>
+        `;
+    }
+    table.insertBefore(tb, tfoot);
+  }
+}
+
+function addRow(day){
+  const tb = document.getElementById("day-" + day);
+  const tr = document.createElement("tr");
+  tr.classList.add("entry-row");
+  tr.innerHTML = `
+    <td></td>
+    <td><div class="amount1-wrapper"><button type="button" class="std-amount-btn" onclick="setStandardAmountForRow(this, 33, ${day})" title="33 € einfügen">33</button><input class="amount1 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)" onblur="handleExit(event)"></div></td>
+    <td>
+      <div class="amount2-wrapper" style="display:none;">
+        <input class="amount2 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)" onblur="handleExit(event)">
+      </div>
+      <button type="button" class="toggle-amount2" style="display:none;" onclick="toggleAmount2(this, ${day})">+ Betrag 2</button>
+    </td>
+    <td class="scroll-to-summary"></td>
+    <td></td>`;
+  const summary = tb.querySelector("tr.day-summary");
+  if(summary){
+    tb.insertBefore(tr, summary);
+  } else {
+    tb.appendChild(tr);
+  }
+
+  // Move the scroll indicator to the newly added row
+  if (typeof updateScrollArrow === 'function') {
+    updateScrollArrow(tr);
+  }
+}
+
+// Schlüssel für localStorage
+function dayKey(day){
+  return "day-" + selYear + "-" + selMonth + "-" + day;
+}
+
+// Monatsspezifischer Schlüssel für Trinkgeld
+function tipKey(){
+  return "totalTip-" + selYear + "-" + selMonth;
+}
+
+// Tag neu berechnen und speichern
+function updateDay(day){
+  let sum = 0;
+  let customers = 0;
+  document.querySelectorAll("#day-" + day + " .entry-row").forEach(row => {
+    const a1 = parseFloat(row.querySelector(".amount1")?.value) || 0;
+    const a2 = parseFloat(row.querySelector(".amount2")?.value) || 0;
+    if(a1 > 0 || a2 > 0) customers++;
+    sum += a1 + a2;
+  });
+  document.getElementById("sum-" + day).innerText = sum > 0 ? sum.toFixed(2) : "";
+  document.getElementById("cnt-" + day).innerText = customers > 0 ? customers : "";
+
+  saveDay(day);
+  updateTotals();
+
+  // Wenn an diesem Tag nun eine Summe > 0 vorhanden ist, prüfen,
+  // ob der vorherige Arbeitstag ohne Eintrag ist.
+  if (sum > 0) {
+    checkPreviousWorkdayForMissingEntries(day);
+  }
+
+  // Falls der aktuell bearbeitete Tag selbst der zuletzt gemeldete
+  // fehlende Tag ist und nun einen Eintrag hat, den Hinweis ausblenden.
+  if (typeof lastMissingDay !== "undefined" && lastMissingDay === day) {
+    if (dayHasAnyEntry(day)) {
+      hideMissingDayHint();
+    }
+  }
+}
+
+function saveDay(day){
+  const rows = [...document.querySelectorAll("#day-" + day + " .entry-row")].map(row => ({
+    amount1: row.querySelector(".amount1")?.value || "",
+    amount2: row.querySelector(".amount2")?.value || ""
+  }));
+  localStorage.setItem(dayKey(day), JSON.stringify(rows));
+}
+
+function loadDay(day){
+  const raw = localStorage.getItem(dayKey(day));
+  if(!raw) return;
+  let rows;
+  try {
+    rows = JSON.parse(raw);
+  } catch (err) {
+    console.warn("Ungültige gespeicherte Daten für ", dayKey(day), err);
+    // Daten nicht laden (Tip & Monat bleiben trotzdem korrekt)
+    return;
+  }
+  if(!Array.isArray(rows)) return;
+  const tb = document.getElementById("day-" + day);
+  if(!tb) return;
+rows.forEach((r, idx) => {
+    if(idx > 0) addRow(day);
+    const row = tb.querySelectorAll(".entry-row")[idx];
+    const a1 = row.querySelector(".amount1");
+    const a2 = row.querySelector(".amount2");
+    const wrapper = row.querySelector(".amount2-wrapper");
+    const toggleBtn = row.querySelector(".toggle-amount2");
+
+    // Kompatibilität: sowohl amount1/amount2 als auch a1/a2 akzeptieren
+    a1.value = r.amount1 !== undefined ? r.amount1 : (r.a1 || "");
+    a2.value = r.amount2 !== undefined ? r.amount2 : (r.a2 || "");
+
+    checkInput(a1);
+    checkInput(a2);
+
+    if(wrapper){
+      if(a2.value !== ""){
+        wrapper.style.display = "block";
+        if(toggleBtn) toggleBtn.textContent = "− Betrag 2";
+      } else {
+        wrapper.style.display = "none";
+        if(toggleBtn) toggleBtn.textContent = "+ Betrag 2";
+      }
+    }
+  });
+
+  updateDay(day);
+}
+
+function loadAllDays(){
+  // Wichtig: Trinkgeld immer zuerst monatsbezogen laden,
+  // damit es NICHT „mitwandert“, falls es beim Laden einzelner Tage Fehler gibt.
+  const tip = document.getElementById("total-tip");
+  if (tip) {
+    tip.value = localStorage.getItem(tipKey()) || "";
+    checkInput(tip);
+  }
+
+  for(let d = 1; d <= selDays; d++){
+    try {
+      loadDay(d);
+    } catch (err) {
+      console.warn("Fehler beim Laden von Tag "+d, err);
+    }
+  }
+  // Nach dem Laden aller Tage Buttons für Betrag 2 korrekt initialisieren
+  updateAmount2ButtonsVisibility();
+}
+// Gesamtsummen
+function updateTotals(){
+  let total = 0;
+  let totalCustomers = 0;
+  for(let d = 1; d <= selDays; d++){
+    const s = parseFloat(document.getElementById("sum-" + d)?.innerText) || 0;
+    const c = parseInt(document.getElementById("cnt-" + d)?.innerText) || 0;
+    total += s;
+    totalCustomers += c;
+  }
+  document.getElementById("grand-total").innerText = total.toFixed(2);
+  const grandCustomersEl = document.getElementById("grand-customers");
+  if (grandCustomersEl) grandCustomersEl.innerText = totalCustomers;
+
+  const tipInput = document.getElementById("total-tip");
+  const tip = parseFloat(tipInput.value) || 0;
+  localStorage.setItem(tipKey(), tip);
+
+  const withTip = total + tip;
+  document.getElementById("with-tip").innerText = withTip.toFixed(2);
+
+  const net = withTip / 1.19;
+  document.getElementById("net-total").innerText = net.toFixed(2);
+  document.getElementById("tax-total").innerText = (withTip - net).toFixed(2);
+
+  // Beschriftung des Zurück-Pfeils abhängig davon, ob Daten vorhanden sind
+  updateBackArrowLabel();
+}
+
+// JSON Export / Import
+function exportJSON(){
+  const data = {
+    year: selYear,
+    month: selMonth,
+    days: {},
+    free: {},
+    totalTip: localStorage.getItem(tipKey()) || ""
+  };
+
+  for(let d = 1; d <= selDays; d++){
+    const key = dayKey(d);
+    const raw = localStorage.getItem(key);
+    if(raw) data.days[key] = JSON.parse(raw);
+
+    const cf = "cf-" + selYear + "-" + selMonth + "-" + d;
+    const freeVal = localStorage.getItem(cf);
+    if(freeVal) data.free[cf] = freeVal;
+  }
+
+  // Standard-Dateinamen vorschlagen
+  const defaultName = "einnahmen_" + selYear + "-" + String(selMonth+1).padStart(2,"0") + ".json";
+
+  // Hinweis, wo gespeichert wird, und Möglichkeit zur Umbenennung
+  const message = "Die Datei wird in Ihrem Standard-Download-Ordner gespeichert (z.B. 'Downloads').\n\n"
+    + "Vorgeschlagener Dateiname:\n" + defaultName + "\n\n"
+    + "Sie können den Dateinamen hier ändern oder einfach mit OK bestätigen.";
+
+  let filename = prompt(message, defaultName);
+  if (filename === null) {
+    // Benutzer hat Abbrechen gewählt → nicht speichern
+    return;
+  }
+  filename = filename.trim();
+  if (!filename) {
+    filename = defaultName;
+  }
+  if (!filename.toLowerCase().endsWith(".json")) {
+    filename += ".json";
+  }
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importJSON(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const data = JSON.parse(e.target.result);
+      if(data.days){
+        for(const key in data.days){
+          localStorage.setItem(key, JSON.stringify(data.days[key]));
+        }
+      }
+      if(data.free){
+        for(const key in data.free){
+          const val = data.free[key];
+          // Ältere Exporte speicherten nur "1" → standardmäßig als "urlaub" interpretieren
+          if(val === 1 || val === "1" || val === true){
+            localStorage.setItem(key, "urlaub");
+          } else if(val === "urlaub" || val === "krank") {
+            localStorage.setItem(key, val);
+          } else {
+            // Unbekannte Werte ebenfalls als Urlaub behandeln, damit zyklisches Umschalten funktioniert
+            localStorage.setItem(key, "urlaub");
+          }
+        }
+      }
+      if(data.totalTip !== undefined){
+        localStorage.setItem(tipKey(), data.totalTip);
+      }
+      alert("Import erfolgreich. Seite wird neu geladen.");
+      location.reload();
+    }catch(err){
+      alert("Fehler beim Import: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// Alle gespeicherten Daten löschen
+function clearAllData(){
+  // Hinweis mit Backup-Info und Bezug auf den aktuellen Monat
+  const monthLabel = (selMonth + 1).toString().padStart(2, "0") + "." + selYear;
+  const confirmMsg =
+    "Es wird jetzt eine Sicherungsdatei für den aktuell ausgewählten Monat (" + monthLabel + ") erstellt,\n" +
+    "und anschließend werden alle Daten dieses Monats gelöscht.\n\n" +
+    "Fortfahren?";
+
+  if (!confirm(confirmMsg)) {
+    return;
+  }
+
+  // Zuerst automatische Sicherung des aktuellen Monats als JSON
+  const data = {
+    year: selYear,
+    month: selMonth,
+    days: {},
+    free: {},
+    totalTip: localStorage.getItem(tipKey()) || ""
+  };
+
+  for (let d = 1; d <= selDays; d++) {
+    const key = dayKey(d);
+    const raw = localStorage.getItem(key);
+    if (raw) data.days[key] = JSON.parse(raw);
+
+    const cf = "cf-" + selYear + "-" + selMonth + "-" + d;
+    const freeVal = localStorage.getItem(cf);
+    if (freeVal) data.free[cf] = freeVal;
+  }
+
+  const backupName = "backup_einnahmen_" +
+    selYear + "-" + String(selMonth + 1).padStart(2, "0") + ".json";
+
+  try {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = backupName;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.error("Backup konnte nicht erstellt werden:", e);
+  }
+
+  // Danach nur die Daten des aktuellen Monats aus dem Speicher entfernen
+  for (let d = 1; d <= selDays; d++) {
+    const key = dayKey(d);
+    localStorage.removeItem(key);
+    const cf = "cf-" + selYear + "-" + selMonth + "-" + d;
+    localStorage.removeItem(cf);
+  }
+  localStorage.removeItem(tipKey());
+
+  alert("Backup erstellt. Alle Daten für den Monat " + monthLabel + " wurden gelöscht.");
+  location.reload();
+}
+
+
+// CSV Export
+function exportCSV(){
+  let lines=["Tag;Betrag1;Betrag2"];
+  for(let d=1; d<=selDays; d++){
+    let rows = document.querySelectorAll("#day-"+d+" .entry-row");
+    rows.forEach(r=>{
+      let a1 = r.querySelector(".amount1")?.value || "";
+      let a2 = r.querySelector(".amount2")?.value || "";
+      lines.push(`${d};${a1};${a2}`);
+    });
+  }
+  let blob=new Blob([lines.join("\n")],{type:"text/csv"});
+  let url=URL.createObjectURL(blob);
+  let a=document.createElement("a");
+  a.href=url;
+  a.download="einnahmen.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+</script>
+<style>
+/*
+ * Im Druckmodus wird nur der Bereich "#reduced-print" ausgegeben. Auf einigen
+ * Mobilgeräten kann "visibility: hidden" dazu führen, dass leere Seiten
+ * entstehen, da der verborgene Inhalt weiterhin Platz reserviert. Daher
+ * verwenden wir "display: none" für alle Elemente außer dem Ausdrucksbereich
+ * und blenden diesen explizit über "display: block" ein. Zusätzlich sorgen
+ * wir für eine klare Formatierung (monospace‑Schrift) und setzen Farbe und
+ * Hintergrund, damit die PDF‑Darstellung auf Smartphones korrekt ist.
+ */
+@media print {
+  /* Alle Elemente standardmäßig ausblenden */
+  body * {
+    display: none !important;
+  }
+  /* Den Ausdrucksbereich und seine Kinder sichtbar machen */
+  #reduced-print, #reduced-print * {
+    display: block !important;
+  }
+  #reduced-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    font-family: monospace;
+    white-space: pre;
+    font-size: 12pt;
+    color: black !important;
+    background: white !important;
+  }
+}
+
+/* Äußerer Rahmen pro Tag */
+tbody[id^="day-"] {
+  border: 2px solid #333;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+/* Keine Rahmen innerhalb eines Tagesblocks */
+tbody[id^="day-"] td,
+tbody[id^="day-"] tr {
+  border: none !important;
+  outline: none !important;
+}
+
+/* Inputs bleiben sichtbar, aber dezent */
+tbody[id^="day-"] input {
+  border: 1px solid #ccc;
+}
+
+
+/* Größere Darstellung der Tageszahlen (erste Spalte) */
+tbody[id^="day-"] tr:first-child td:first-child {
+  font-size: 1.4em;
+  font-weight: bold;
+}
+
+
+/* Auch Tageszahlen in freien Tagen (z. B. Samstag, Sonntag, Feiertag) größer darstellen */
+tr.frei td span.fett {
+  font-size: 1.4em;
+}
+
+
+/* Auch reguläre Tageszahlen größer darstellen */
+tbody[id^="day-"] tr td:first-child {
+  font-size: 1.4em;
+  font-weight: bold;
+}
+
+
+/* Tagessumme (rechts unten) und Kundenanzahl fett */
+tbody[id^="day-"] tr:last-child td:last-child,
+tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
+  font-weight: bold;
+}
+
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
+<body class="bg-darkblue" onload="updateMonth()">
+<div class="container">
+<h1>Einnahmen V154</h1>
+<div id="month-nav">
+<button class="nav-btn" onclick="prevMonth()">◄</button>
+<span id="selected-month"></span><span id="month-lock-toggle" onclick="toggleLock()" style="cursor:pointer; font-size: 1.4em; margin-left: 10px;" title="Monat bearbeiten/sperren">🔓</span>
+<button class="nav-btn" onclick="nextMonth()">►</button>
+</div>
+<table id="main-table">
+<thead>
+<tr>
+<th>Tag</th>
+<th>Betrag 1</th>
+<th>Betrag 2</th>
+<th>Summe</th>
+<th>Kunden</th>
+</tr>
+</thead>
+<tfoot></tfoot>
+<tr>
+<!-- Beschriftung links und Gesamtzahl der Kunden in der letzten Spalte -->
+<!-- Der Text "Gesamtanzahl Kunden:" wird bewusst etwas kleiner dargestellt, bleibt aber schwarz -->
+<td colspan="4" style="text-align: right;
+             font-weight: normal;
+             color: #000;
+             font-size: 0.8em;
+             font-style: italic;">
+    Gesamtanzahl Kunden:
+  </td>
+<td id="grand-customers" style="font-weight: bold;">0</td>
+</tr>
+</table>
+<div style="margin-top:20px;">
+<button onclick="generateReducedPrint()" style="margin-left:10px;">🖨️ Reduzierter Druck</button>
+<button onclick="exportJSON()">Datei speichern</button>
+<input accept="application/json" id="data-file-input" onchange="importJSON(event)" style="display:none;" type="file"/>
+<button onclick="document.getElementById('data-file-input').click()" style="margin-left:10px;">Datei laden</button>
+<div style="display:inline-block; margin-left:10px;">
+  <button onclick="clearAllData()">Alle Daten löschen</button><br/>
+  <span class="scroll-back-wrapper" title="Zum letzten Eintrag springen">
+    <span class="scroll-circle">↑</span><span class="scroll-text"> zum letzten Eintrag</span>
+  </span>
+</div>
+<button onclick="exportExcel()" style="margin-left:10px;">📊 Excel speichern</button></div>
+<div id="onscreen-totals" style="margin-top:20px;">
+<h3>Monatsübersicht</h3>
+<table>
+<tr><th>Gesamtsumme</th><td id="grand-total"></td></tr>
+<tr><th>Trinkgeld</th><td><input id="total-tip" style="width: 80px;" oninput="checkInput(this); updateTotals()"/></td></tr>
+<tr><th>Summe inkl. Trinkgeld</th><td id="with-tip"></td></tr>
+<tr><th>Netto</th><td id="net-total"></td></tr>
+<tr><th>MwSt</th><td id="tax-total"></td></tr>
+</table>
+</div>
+<div class="print-summary" style="display:none;">
+<h3>Monatsübersicht (Druck)</h3>
+<table>
+<tr><th>Gesamtsumme</th><td id="grand-total-print"></td></tr>
+<tr><th>Trinkgeld</th><td id="tip-print"></td></tr>
+<tr><th>Summe inkl. Trinkgeld</th><td id="with-tip-print"></td></tr>
+<tr><th>Netto</th><td id="net-total-print"></td></tr>
+<tr><th>MwSt</th><td id="tax-total-print"></td></tr>
+</table>
+</div>
+</div>
+<div id="reduced-print" style="display:none;"></div>
+<script>
+/**
+ * Erzeugt einen einfachen Ausdruck der Tages- und Monatsübersicht.
+ * Diese Funktion sammelt alle Einträge, summiert sie, erzeugt eine
+ * textbasierte Tabelle und öffnet den Browser-Druckdialog. Es wird
+ * außerdem die Gesamtanzahl aller Kunden am Monatsende ausgegeben.
+ */
+function generateReducedPrint() {
+  let output = "";
+  const month = document.getElementById("selected-month").innerText;
+  output += "Einnahmen " + month + "\n\n";
+
+  let total = 0;
+  let totalCustomers = 0;
+
+  for (let d = 1; d <= selDays; d++) {
+    const tbody = document.getElementById("day-" + d);
+    if (!tbody) continue;
+
+    const rows = tbody.querySelectorAll("tr.entry-row");
+    // Falls es keine Eintragszeilen gibt, prüfen ob der Tag als Urlaub oder Krankheit markiert ist.
+    if (rows.length === 0) {
+      // Typ des eigenen freien Tages aus dem localStorage abrufen, sofern Funktion verfügbar.
+      let freeType = null;
+      try {
+        if (typeof getFreeDayType === 'function') {
+          freeType = getFreeDayType(d);
+        }
+      } catch (e) {
+        freeType = null;
+      }
+      // Wenn der Tag als frei markiert ist, Grund in den Ausdruck aufnehmen.
+      if (freeType) {
+        // Datum im Format TT.MM.JJJJ
+        const date = String(d).padStart(2, "0") + "." + String(selMonth + 1).padStart(2, "0") + "." + selYear;
+        // Menschlich lesbare Beschriftung abhängig vom Typ
+        const label = freeType === "urlaub"
+          ? "Urlaubstag"
+          : (freeType === "krank"
+             ? "Krankheitstag"
+             : "Eigener freier Tag");
+        output += date.padEnd(12) + label + "\n\n";
+      }
+      continue;
+    }
+
+    let tagSum = 0;
+    let kunden = 0;
+    let zeilen = [];
+
+    rows.forEach(r => {
+      // Betragswerte als Strings auslesen und in Zahlen konvertieren
+      const a1Str = r.querySelector(".amount1")?.value || "";
+      const a2Str = r.querySelector(".amount2")?.value || "";
+      const num1 = parseFloat(String(a1Str).replace(",", "."));
+      const num2 = parseFloat(String(a2Str).replace(",", "."));
+      const sumVal = (isNaN(num1) ? 0 : num1) + (isNaN(num2) ? 0 : num2);
+      if (sumVal > 0) {
+        kunden++;
+        // Formatierfunktion für zwei Dezimalstellen mit deutschem Dezimaltrennzeichen
+        const fmt = n => n.toFixed(2).replace(".", ",");
+        const formattedSum = fmt(sumVal);
+        // formatierte Einzelbeträge
+        const fmt1 = !isNaN(num1) ? fmt(num1) : "";
+        const fmt2 = !isNaN(num2) && num2 > 0 ? fmt(num2) : "";
+        let line;
+        if (a2Str && fmt2) {
+          // Gesamtbetrag plus Einzelbeträge rechts daneben
+          line = formattedSum.padStart(10) + "   " + fmt1 + " + " + fmt2;
+        } else {
+          line = fmt1.padStart(10);
+        }
+        zeilen.push(line);
+        tagSum += sumVal;
+      }
+    });
+
+    if (tagSum > 0) {
+      // Datum im Format TT.MM.JJJJ
+      const date = String(d).padStart(2, "0") + "." + String(selMonth + 1).padStart(2, "0") + "." + selYear;
+      const maxLines = Math.max(zeilen.length, 1);
+      for (let i = 0; i < maxLines; i++) {
+        const datum = i === 0 ? date.padEnd(12) : " ".repeat(12);
+        // Zeile enthält bereits gepaddeten Gesamtbetrag und ggf. separate Beträge rechts davon.
+        const einnahme = zeilen[i] || "";
+        output += datum + einnahme + "\n";
+      }
+      output += " ".repeat(12) + "----------\n";
+      output += " ".repeat(12) + tagSum.toFixed(2).replace(".", ",").padStart(10) + "   |   " + kunden + " Kunden\n\n";
+
+      total += tagSum;
+      totalCustomers += kunden;
+    }
+  }
+
+  // Trinkgeld, Netto, MwSt berechnen
+  const tip = parseFloat(document.getElementById("total-tip")?.value.replace(",", ".") || "0");
+  const withTip = total + tip;
+  const netto = withTip / 1.19;
+  const mwst = withTip - netto;
+
+  const labelWidth = 24;
+  // Helferfunktion für eine Zeile der Monatsübersicht
+  function line(label, value) {
+    return label.padEnd(labelWidth) + value.toFixed(2).replace(".", ",").padStart(10) + "\n\n";
+  }
+
+  // Monatsübersicht
+  output += "Monatsübersicht\n";
+  output += "----------------\n\n";
+  output += line("Gesamtsumme:", total);
+  output += line("Trinkgeld:", tip);
+  output += line("Summe inkl. Trinkgeld:", withTip);
+  output += line("Netto:", netto);
+  output += line("MwSt (19%):", mwst);
+  // Gesamtanzahl der Kunden anhängen
+  output += "Gesamtanzahl Kunden:".padEnd(labelWidth) + String(totalCustomers).padStart(10) + "\n\n";
+
+  // Text in das versteckte Druckdiv schreiben und anzeigen
+  const rp = document.getElementById("reduced-print");
+  rp.innerText = output;
+  rp.style.display = "block";
+  // kurze Verzögerung, damit das DOM aktualisiert wird
+  setTimeout(() => {
+    window.print();
+    rp.style.display = "none";
+  }, 100);
+}
+</script>
+<script>
+function updateCustomerTotal() {
+  let totalCustomers = 0;
+  const rows = document.querySelectorAll("tbody[id^='day-'] tr.entry-row");
+  rows.forEach(row => {
+    const amount1 = row.querySelector(".amount1")?.value || "";
+    const amount2 = row.querySelector(".amount2")?.value || "";
+    let sum = 0;
+    if (amount1) sum += parseFloat(amount1.replace(",", "."));
+    if (amount2) sum += parseFloat(amount2.replace(",", "."));
+    if (sum > 0) totalCustomers++;
+  });
+  const target = document.getElementById("grand-customers");
+  if (target) target.textContent = totalCustomers;
+}
+
+document.addEventListener("DOMContentLoaded", updateCustomerTotal);
+document.addEventListener("input", function(e) {
+  if (e.target.classList.contains("amount1") || e.target.classList.contains("amount2")) {
+    updateCustomerTotal();
+  }
+});
+
+// Delegate click events for scroll-to-summary elements to smoothly scroll to the monthly totals
+document.addEventListener('click', function(event) {
+  const circle = event.target.closest('.scroll-circle');
+  if (circle && circle.closest('.scroll-to-summary')) {
+    // Nur ein Klick direkt auf den Kreis-Pfeil in der Tageszeile
+    // scrollt zur Monatsübersicht.
+    event.preventDefault();
+    const totals = document.getElementById('onscreen-totals');
+    if (totals) {
+      totals.scrollIntoView({ behavior: 'smooth' });
+    }
+  }
+});
+
+
+document.addEventListener('click', function(event) {
+  // Nur ein Klick direkt auf den Kreis-Pfeil im unteren "Zurück"-Bereich
+  // soll scrollBackToLastEntry auslösen, nicht ein Klick daneben.
+  const backCircle = event.target.closest('.scroll-back-wrapper .scroll-circle');
+  if (backCircle) {
+    event.preventDefault();
+    scrollBackToLastEntry();
+  }
+});
+
+// Keep track of which entry row currently holds the scroll indicator
+
+// Hilfsfunktion: Liefert die Tagesnummer (1..31) für eine Eintragszeile
+// oder null, falls die Zeile keinem Tag zugeordnet werden kann.
+function getDayFromEntryRow(row) {
+  if (!row) return null;
+  const tbody = row.closest("tbody[id^='day-']");
+  if (!tbody || !tbody.id) return null;
+  const parts = tbody.id.split("-");
+  if (parts.length < 2) return null;
+  const day = parseInt(parts[1], 10);
+  return isNaN(day) ? null : day;
+}
+
+// Entfernt die letzte Eintragszeile eines Tages, falls sie komplett leer ist
+// (weder Betrag 1 noch Betrag 2) und es noch mindestens eine weitere Zeile
+// in diesem Tag gibt. Dadurch verschwinden unbenutzte, per Enter erzeugte
+// Zusatzzeilen automatisch, sobald im nächsten Tag weitergearbeitet wird.
+function removeTrailingEmptyRow(day) {
+  if (day == null) return;
+  const tbody = document.getElementById("day-" + day);
+  if (!tbody) return;
+
+  let rows = tbody.querySelectorAll("tr.entry-row");
+  let removed = false;
+
+  // Alle leeren Zeilen am Ende eines Tages entfernen, aber immer
+  // mindestens eine Zeile pro Tag übrig lassen.
+  while (rows.length > 1) {
+    const lastRow = rows[rows.length - 1];
+    const a1 = lastRow.querySelector(".amount1");
+    const a2 = lastRow.querySelector(".amount2");
+    const hasValue = (a1 && a1.value !== "") || (a2 && a2.value !== "");
+    if (hasValue) break;
+    lastRow.remove();
+    removed = true;
+    rows = tbody.querySelectorAll("tr.entry-row");
+  }
+
+  if (removed) {
+    updateDay(day);
+  }
+}
+
+
+function copyPrevAmount(button) {
+  const row = button.closest('tr.entry-row');
+  if (!row) return;
+
+  // Alle Eintragszeilen im Monat in Dokument-Reihenfolge holen
+  const allRows = Array.from(document.querySelectorAll('tbody[id^="day-"] tr.entry-row'));
+  const idx = allRows.indexOf(row);
+  if (idx <= 0) return; // keine vorherige Zeile im Monat
+
+  // Geeignete vorherige Zeile mit einem gesetzten Betrag 1 suchen
+  let prevInput = null;
+  for (let i = idx - 1; i >= 0; i--) {
+    const candidate = allRows[i].querySelector('.amount1');
+    if (candidate && candidate.value !== "") {
+      prevInput = candidate;
+      break;
+    }
+  }
+  if (!prevInput) return;
+
+  const currentInput = row.querySelector('.amount1');
+  if (!currentInput) return;
+  currentInput.value = prevInput.value;
+  currentInput.classList.remove('empty-input');
+  currentInput.focus();
+  if (typeof currentInput.select === "function") {
+    currentInput.select();
+  }
+
+  if (typeof getDayFromEntryRow === "function") {
+    const day = getDayFromEntryRow(row);
+    if (day != null) {
+      updateDay(day);
+    }
+  }
+}
+
+/**
+ * Setzt einen Standardbetrag (z.B. 33 €) in das Betrag-1-Feld der aktuellen Zeile.
+ * Der Button steht links neben dem Feld und bezieht den passenden Tag über den Parameter day.
+ */
+function setStandardAmountForRow(button, value, day) {
+  const wrapper = button.closest('.amount1-wrapper');
+  if (!wrapper) return;
+  const input = wrapper.querySelector('.amount1');
+  if (!input) return;
+
+  input.value = value;
+
+  if (typeof checkInput === "function") {
+    checkInput(input);
+  }
+
+  if (typeof updateDay === "function" && !isNaN(day)) {
+    updateDay(day);
+  }
+
+  input.focus();
+  if (typeof input.select === "function") {
+    input.select();
+  }
+}
+
+let lastFocusedDay = null;
+
+let currentScrollRow = null;
+
+/**
+ * Move the arrow indicator to the given entry row. The indicator is shown by
+ * inserting a downward arrow character into the row's scroll-to-summary cell and
+ * clearing it from any previous row. This ensures only one arrow is visible at
+ * a time.
+ * @param {HTMLElement} row The table row (tr.entry-row) to highlight.
+ */
+function updateScrollArrow(row) {
+  // Remove arrow from previous row
+  if (currentScrollRow && currentScrollRow !== row) {
+    const prevCell = currentScrollRow.querySelector('.scroll-to-summary');
+    if (prevCell) {
+      prevCell.innerHTML = '';
+      prevCell.classList.remove('active');
+      prevCell.removeAttribute('title');
+    }
+  }
+  currentScrollRow = row;
+  // Set arrow and Text auf der aktuellen Zeile
+  if (row) {
+    const cell = row.querySelector('.scroll-to-summary');
+    if (cell) {
+      cell.innerHTML = '<span class="scroll-circle">↓</span><span class="scroll-text"> zur Monatsübersicht</span>';
+      cell.classList.add('active');
+      cell.setAttribute('title', 'Zur Monatsübersicht scrollen');
+    }
+  }
+}
+
+// When an amount field gains focus, move the arrow to its row
+document.addEventListener('focusin', function(e) {
+  if (e.target && (e.target.classList.contains('amount1') || e.target.classList.contains('amount2'))) {
+    const row = e.target.closest('tr.entry-row');
+    if (row) {
+      const day = getDayFromEntryRow(row);
+      // Wenn von einem Tag zu einem anderen gewechselt wird, ggf. letzte
+      // leere Zusatzzeile im vorherigen Tag entfernen.
+      if (lastFocusedDay !== null && day !== null && day !== lastFocusedDay) {
+        removeTrailingEmptyRow(lastFocusedDay);
+      }
+      lastFocusedDay = day;
+      updateScrollArrow(row);
+    }
+  }
+});
+
+// Scroll to the monthly summary when the user clicks the scroll button
+function scrollToTotals() {
+  const totals = document.getElementById("onscreen-totals");
+  if (totals) {
+    totals.scrollIntoView({ behavior: "smooth" });
+  }
+}
+
+// Scrollt zur zuletzt bearbeiteten Eintragszeile (falls vorhanden)
+function scrollBackToLastEntry() {
+  // Wenn keine Daten vorhanden sind, ganz nach oben zum Seitenanfang scrollen.
+  if (!hasAnyDataInMonth()) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  // Ansonsten wie bisher zur zuletzt bearbeiteten Eintragszeile scrollen.
+  if (typeof currentScrollRow !== 'undefined' && currentScrollRow) {
+    const rect = currentScrollRow.getBoundingClientRect();
+    const rowTop = rect.top + window.pageYOffset;
+    // Zielposition so berechnen, dass sie nicht kleiner als 0 ist. Wird der Wert
+    // negativ, führt scrollTo sonst nur an den Seitenanfang und nicht mittig.
+    let target = rowTop - (window.innerHeight / 2) + (rect.height / 2);
+    if (target < 0) target = 0;
+    window.scrollTo({ top: target, behavior: 'smooth' });
+  }
+}
+</script>
+
+
+<script>
+function exportExcel() {
+  const wb = XLSX.utils.book_new();
+  const ws_data = [];
+
+  let total = 0;
+  let totalCustomers = 0;
+
+  for (let d = 1; d <= selDays; d++) {
+    const dateStr = String(d).padStart(2, "0") + "." + String(selMonth + 1).padStart(2, "0") + "." + selYear;
+    const tbody = document.getElementById("day-" + d);
+    if (!tbody) continue;
+
+    const rows = tbody.querySelectorAll("tr.entry-row");
+
+    // Eigene freie Tage (Urlaub / Krankheit / sonstiger freier Tag) ohne Einträge
+    // sollen ebenfalls im Excel erscheinen.
+    if (rows.length === 0) {
+      let freeType = null;
+      try {
+        if (typeof getFreeDayType === "function") {
+          freeType = getFreeDayType(d);
+        }
+      } catch (e) {
+        freeType = null;
+      }
+
+      if (freeType) {
+        let label;
+        if (freeType === "urlaub") {
+          label = "Urlaubstag";
+        } else if (freeType === "krank") {
+          label = "Krankheitstag";
+        } else {
+          // z.B. ältere Daten, bei denen nur ein generischer Wert gespeichert wurde
+          label = "Eigener freier Tag";
+        }
+
+        ws_data.push([dateStr, label]);
+        ws_data.push([]); // Leerzeile als Abstand
+      }
+      // Keine Umsätze/Kunden für freie Tage
+      continue;
+    }
+
+    let dayLines = [];
+    let tagSum = 0;
+    let kunden = 0;
+
+    rows.forEach(r => {
+      const a1Str = r.querySelector(".amount1")?.value || "";
+      const a2Str = r.querySelector(".amount2")?.value || "";
+
+      const num1 = parseFloat(String(a1Str).replace(",", "."));
+      const num2 = parseFloat(String(a2Str).replace(",", "."));
+      const sumVal = (isNaN(num1) ? 0 : num1) + (isNaN(num2) ? 0 : num2);
+
+      if (sumVal > 0) {
+        kunden++;
+        const fmt = n => n.toFixed(2).replace(".", ",");
+        const formattedSum = fmt(sumVal);
+        const fmt1 = !isNaN(num1) ? fmt(num1) : "";
+        const fmt2 = !isNaN(num2) && num2 > 0 ? fmt(num2) : "";
+
+        if (a2Str && fmt2) {
+          dayLines.push(["", formattedSum, `${fmt1} + ${fmt2}`]);
+        } else {
+          dayLines.push(["", fmt1, ""]);
+        }
+
+        tagSum += sumVal;
+      }
+    });
+
+    if (tagSum > 0) {
+      ws_data.push([dateStr]); // Datum als Überschrift
+      dayLines.forEach(l => ws_data.push(l));
+      ws_data.push(["", "----------"]);
+      ws_data.push(["", tagSum.toFixed(2).replace(".", ","), `|   ${kunden} Kunden`]);
+      ws_data.push([]); // Leere Zeile
+      total += tagSum;
+      totalCustomers += kunden;
+    }
+  }
+
+  // Monatsübersicht mit Trinkgeld, Netto, MwSt
+  const tip = parseFloat(document.getElementById("total-tip")?.value.replace(",", ".") || "0");
+  const withTip = total + tip;
+  const netto = withTip / 1.19;
+  const mwst = withTip - netto;
+
+  const fmt = n => n.toFixed(2).replace(".", ",");
+
+  ws_data.push([]);
+  ws_data.push(["Monatsübersicht"]);
+  ws_data.push(["----------------"]);
+  ws_data.push(["Gesamtsumme:", fmt(total)]);
+  ws_data.push(["Trinkgeld:", fmt(tip)]);
+  ws_data.push(["Summe inkl. Trinkgeld:", fmt(withTip)]);
+  ws_data.push(["Netto:", fmt(netto)]);
+  ws_data.push(["MwSt (19%):", fmt(mwst)]);
+  ws_data.push(["Gesamtanzahl Kunden:", totalCustomers]);
+
+  const ws = XLSX.utils.aoa_to_sheet(ws_data);
+  XLSX.utils.book_append_sheet(wb, ws, "Einnahmen");
+
+  const filename = `Einnahmen_${selYear}-${String(selMonth+1).padStart(2,"0")}.xlsx`;
+  XLSX.writeFile(wb, filename);
+}
+
+</script>
+
+<script>
+// Lock-Funktionen für Monatssperre
+function isMonthLocked(year, month) {
+  return localStorage.getItem(`locked-${year}-${month}`) === "1";
+}
+
+function setMonthLocked(year, month, locked) {
+  if (locked) {
+    localStorage.setItem(`locked-${year}-${month}`, "1");
+  } else {
+    localStorage.removeItem(`locked-${year}-${month}`);
+  }
+}
+
+function toggleLock() {
+  const locked = isMonthLocked(selYear, selMonth);
+  setMonthLocked(selYear, selMonth, !locked);
+  applyLockStatus();
+}
+
+function applyLockStatus() {
+  const locked = isMonthLocked(selYear, selMonth);
+  const lockIcon = document.getElementById("month-lock-toggle");
+  if (lockIcon) {
+    lockIcon.textContent = locked ? "🔒" : "🔓";
+    lockIcon.title = locked ? "Monat ist gesperrt. Klick zum Entsperren." : "Monat ist offen. Klick zum Sperren.";
+  }
+
+  document.querySelectorAll("input, button").forEach(el => {
+    if (
+      !el.classList.contains("nav-btn") &&
+      el.id !== "month-lock-toggle" &&
+      !el.closest("#month-nav")
+    ) {
+      el.disabled = locked;
+    }
+  });
+}
+
+// Sperrstatus beim Monatswechsel anwenden
+const _origUpdateMonth = updateMonth;
+updateMonth = function () {
+  _origUpdateMonth();
+  applyLockStatus();
+};
+
+// Sperrstatus beim JSON-Export berücksichtigen
+const _origExportJSON = exportJSON;
+exportJSON = function () {
+  const data = {
+    year: selYear,
+    month: selMonth,
+    days: {},
+    free: {},
+    totalTip: localStorage.getItem(tipKey()) || "",
+    locked: isMonthLocked(selYear, selMonth) ? true : false
+  };
+
+  for(let d = 1; d <= selDays; d++){
+    const key = "day-" + selYear + "-" + selMonth + "-" + d;
+    const raw = localStorage.getItem(key);
+    if(raw) data.days[key] = JSON.parse(raw);
+
+    const cf = "cf-" + selYear + "-" + selMonth + "-" + d;
+    const freeVal = localStorage.getItem(cf);
+    if(freeVal) data.free[cf] = freeVal;
+  }
+
+  const defaultName = "einnahmen_" + selYear + "-" + String(selMonth+1).padStart(2,"0") + ".json";
+  let filename = prompt("Dateiname:", defaultName);
+  if (!filename) return;
+  if (!filename.toLowerCase().endsWith(".json")) {
+    filename += ".json";
+  }
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+// Sperrstatus beim Import wiederherstellen
+const _origImportJSON = importJSON;
+importJSON = function (ev) {
+  const file = ev.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if(data.days){
+        for(const key in data.days){
+          localStorage.setItem(key, JSON.stringify(data.days[key]));
+        }
+      }
+      if(data.free){
+        for(const key in data.free){
+          const val = data.free[key];
+          if(val === 1 || val === "1" || val === true){
+            localStorage.setItem(key, "urlaub");
+          } else if(val === "urlaub" || val === "krank") {
+            localStorage.setItem(key, val);
+          } else {
+            localStorage.setItem(key, "urlaub");
+          }
+        }
+      }
+      if(data.totalTip !== undefined){
+        localStorage.setItem(tipKey(), data.totalTip);
+      }
+      if(data.locked === true){
+        localStorage.setItem(`locked-${data.year}-${data.month}`, "1");
+      }
+      alert("Import erfolgreich. Seite wird neu geladen.");
+      location.reload();
+    } catch(err) {
+      alert("Fehler beim Import: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+};
+
+// Schnelleingabe für einen Standardbetrag (z.B. 33 €) in das aktuell ausgewählte Betrag-1-Fel</script>
+
+</body>
+</html>
