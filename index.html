@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V154</title>
+<title>Einnahmen V156</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -1082,44 +1082,145 @@ function updateTotals(){
 
 // JSON Export / Import
 function exportJSON(){
+  // Exportiert automatisch ALLE Monate, die Daten enthalten (Einnahmen, freie Tage oder Trinkgeld),
+  // nicht nur den aktuell ausgewählten Monat.
   const data = {
-    year: selYear,
-    month: selMonth,
-    days: {},
-    free: {},
-    totalTip: localStorage.getItem(tipKey()) || ""
+    schema: "einnahmen-multi-month-v1",
+    exportedAt: new Date().toISOString(),
+    months: {}
   };
 
-  for(let d = 1; d <= selDays; d++){
-    const key = dayKey(d);
-    const raw = localStorage.getItem(key);
-    if(raw) data.days[key] = JSON.parse(raw);
+  // Hilfsfunktionen
+  const keyMatches = (k, y, m) => k.startsWith("day-" + y + "-" + m + "-");
+  const freeMatches = (k, y, m) => k.startsWith("cf-" + y + "-" + m + "-");
+  const parseNumber = (v) => {
+    const n = parseFloat(String(v || "").replace(",", "."));
+    return isNaN(n) ? 0 : n;
+  };
 
-    const cf = "cf-" + selYear + "-" + selMonth + "-" + d;
-    const freeVal = localStorage.getItem(cf);
-    if(freeVal) data.free[cf] = freeVal;
+  // 1) Alle (Jahr,Monat) Kandidaten aus localStorage sammeln
+  const monthSet = new Set();
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k) continue;
+
+    let m1 = k.match(/^day-(\d+)-(\d+)-(\d+)$/);
+    if (m1) { monthSet.add(m1[1] + "-" + m1[2]); continue; }
+
+    let m2 = k.match(/^cf-(\d+)-(\d+)-(\d+)$/);
+    if (m2) { monthSet.add(m2[1] + "-" + m2[2]); continue; }
+
+    let m3 = k.match(/^totalTip-(\d+)-(\d+)$/);
+    if (m3) {
+      const tipVal = (localStorage.getItem(k) || "").trim();
+      if (tipVal !== "") monthSet.add(m3[1] + "-" + m3[2]);
+      continue;
+    }
   }
+
+  const monthList = Array.from(monthSet)
+    .map(s => {
+      const [y, m] = s.split("-").map(n => parseInt(n, 10));
+      return { year: y, month: m };
+    })
+    .filter(x => !isNaN(x.year) && !isNaN(x.month))
+    .sort((a,b) => (a.year - b.year) || (a.month - b.month));
+
+  // 2) Pro Monat Daten sammeln – aber nur, wenn der Monat wirklich "Daten enthält"
+  monthList.forEach(({year, month}) => {
+    const monthData = { year, month, days: {}, free: {}, totalTip: "" };
+    let hasMeaningfulData = false;
+
+    // Tage
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (!keyMatches(k, year, month)) continue;
+
+      const raw = localStorage.getItem(k);
+      if (!raw) continue;
+
+      // Speichern
+      try {
+        const rows = JSON.parse(raw);
+
+        // Tag nur exportieren, wenn in diesem Tag wirklich ein Betrag eingetragen ist.
+        let dayHasData = false;
+        if (Array.isArray(rows)) {
+          for (const r of rows) {
+            const a1 = (r && (r.amount1 ?? r.a1)) ?? "";
+            const a2 = (r && (r.amount2 ?? r.a2)) ?? "";
+            if (String(a1).trim() !== "" || String(a2).trim() !== "") {
+              const n1 = parseNumber(a1);
+              const n2 = parseNumber(a2);
+              if (n1 !== 0 || n2 !== 0 || String(a1).trim() !== "" || String(a2).trim() !== "") {
+                dayHasData = true;
+                break;
+              }
+            }
+          }
+        }
+
+        if (dayHasData) {
+          monthData.days[k] = rows;
+          hasMeaningfulData = true;
+        }
+      } catch (e) {
+        // Ungültige Daten ignorieren (nicht exportieren)
+      }
+
+      if (hasMeaningfulData) {
+        // nicht breaken: wir wollen trotzdem alle day-Keys exportieren
+      }
+    }
+
+    // Freie Tage
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (!freeMatches(k, year, month)) continue;
+
+      const val = localStorage.getItem(k);
+      if (val !== null && String(val).trim() !== "") {
+        monthData.free[k] = val;
+        hasMeaningfulData = true;
+      }
+    }
+
+    // Trinkgeld
+    const tKey = "totalTip-" + year + "-" + month;
+    const tipStr = (localStorage.getItem(tKey) || "").trim();
+    monthData.totalTip = tipStr;
+    if (tipStr !== "") {
+      hasMeaningfulData = true;
+    }
+
+    // Monat nur aufnehmen, wenn er Daten enthält
+    if (hasMeaningfulData) {
+      data.months[year + "-" + month] = monthData;
+    }
+  });
+
+  const monthCount = Object.keys(data.months).length;
 
   // Standard-Dateinamen vorschlagen
-  const defaultName = "einnahmen_" + selYear + "-" + String(selMonth+1).padStart(2,"0") + ".json";
+  const today = new Date();
+  const isoDate = today.toISOString().slice(0,10); // YYYY-MM-DD
+  const defaultName = "einnahmen_backup_" + isoDate + ".json";
 
-  // Hinweis, wo gespeichert wird, und Möglichkeit zur Umbenennung
-  const message = "Die Datei wird in Ihrem Standard-Download-Ordner gespeichert (z.B. 'Downloads').\n\n"
-    + "Vorgeschlagener Dateiname:\n" + defaultName + "\n\n"
-    + "Sie können den Dateinamen hier ändern oder einfach mit OK bestätigen.";
+  const message =
+    "Es werden alle Monate gespeichert, die Daten enthalten.\n\n" +
+    "Gefundene Monate: " + monthCount + "\n\n" +
+    "Die Datei wird in Ihrem Standard-Download-Ordner gespeichert (z.B. 'Downloads').\n\n" +
+    "Vorgeschlagener Dateiname:\n" + defaultName + "\n\n" +
+    "Sie können den Dateinamen hier ändern oder einfach mit OK bestätigen.";
 
   let filename = prompt(message, defaultName);
-  if (filename === null) {
-    // Benutzer hat Abbrechen gewählt → nicht speichern
-    return;
-  }
+  if (filename === null) return;
+
   filename = filename.trim();
-  if (!filename) {
-    filename = defaultName;
-  }
-  if (!filename.toLowerCase().endsWith(".json")) {
-    filename += ".json";
-  }
+  if (!filename) filename = defaultName;
+  if (!filename.toLowerCase().endsWith(".json")) filename += ".json";
 
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
   const url = URL.createObjectURL(blob);
@@ -1138,6 +1239,49 @@ function importJSON(ev){
   reader.onload = e => {
     try{
       const data = JSON.parse(e.target.result);
+
+      // Neu: Multi-Monats-Format (einnahmen-multi-month-v1)
+      if (data && data.months && typeof data.months === "object") {
+        for (const mk in data.months) {
+          const m = data.months[mk];
+          if (!m) continue;
+
+          // Tage
+          if (m.days && typeof m.days === "object") {
+            for (const key in m.days) {
+              localStorage.setItem(key, JSON.stringify(m.days[key]));
+            }
+          }
+
+          // Freie Tage (Urlaub/Krank)
+          if (m.free && typeof m.free === "object") {
+            for (const key in m.free) {
+              const val = m.free[key];
+              // Ältere Exporte speicherten nur "1" → standardmäßig als "urlaub" interpretieren
+              if(val === 1 || val === "1" || val === true){
+                localStorage.setItem(key, "urlaub");
+              } else if(val === "urlaub" || val === "krank") {
+                localStorage.setItem(key, val);
+              } else {
+                // Unbekannte Werte ebenfalls als Urlaub behandeln, damit zyklisches Umschalten funktioniert
+                localStorage.setItem(key, "urlaub");
+              }
+            }
+          }
+
+          // Trinkgeld je Monat
+          if (m.year !== undefined && m.month !== undefined && m.totalTip !== undefined) {
+            const tKey = "totalTip-" + m.year + "-" + m.month;
+            localStorage.setItem(tKey, m.totalTip);
+          }
+        }
+
+        alert("Import erfolgreich (alle Monate). Seite wird neu geladen.");
+        location.reload();
+        return;
+      }
+
+      // Alt: Ein-Monats-Format (bisheriger Export)
       if(data.days){
         for(const key in data.days){
           localStorage.setItem(key, JSON.stringify(data.days[key]));
@@ -1146,20 +1290,21 @@ function importJSON(ev){
       if(data.free){
         for(const key in data.free){
           const val = data.free[key];
-          // Ältere Exporte speicherten nur "1" → standardmäßig als "urlaub" interpretieren
           if(val === 1 || val === "1" || val === true){
             localStorage.setItem(key, "urlaub");
           } else if(val === "urlaub" || val === "krank") {
             localStorage.setItem(key, val);
           } else {
-            // Unbekannte Werte ebenfalls als Urlaub behandeln, damit zyklisches Umschalten funktioniert
             localStorage.setItem(key, "urlaub");
           }
         }
       }
       if(data.totalTip !== undefined){
+        // Hinweis: Im alten Format wird Trinkgeld unter dem Schlüssel des aktuell gewählten Monats gespeichert.
+        // Das bleibt aus Kompatibilitätsgründen so.
         localStorage.setItem(tipKey(), data.totalTip);
       }
+
       alert("Import erfolgreich. Seite wird neu geladen.");
       location.reload();
     }catch(err){
@@ -1334,7 +1479,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V154</h1>
+<h1>Einnahmen V156</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span><span id="month-lock-toggle" onclick="toggleLock()" style="cursor:pointer; font-size: 1.4em; margin-left: 10px;" title="Monat bearbeiten/sperren">🔓</span>
@@ -1366,7 +1511,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 </table>
 <div style="margin-top:20px;">
 <button onclick="generateReducedPrint()" style="margin-left:10px;">🖨️ Reduzierter Druck</button>
-<button onclick="exportJSON()">Datei speichern</button>
+<button onclick="exportJSON()">Alle Monate speichern</button>
 <input accept="application/json" id="data-file-input" onchange="importJSON(event)" style="display:none;" type="file"/>
 <button onclick="document.getElementById('data-file-input').click()" style="margin-left:10px;">Datei laden</button>
 <div style="display:inline-block; margin-left:10px;">
