@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V159</title>
+<title>Einnahmen V217</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -25,32 +25,22 @@ table { width:100%; border-collapse:collapse; background:#f5f5dc; }
 th, td { border:1px solid black; padding:6px; text-align:center; }
 
 /* Grundlegendes Styling für Betragsfelder und Trinkgeld */
-.amount1, .amount2, #total-tip {
-  box-sizing:border-box;
-  padding:8px;
-  border:1px solid black;
-  text-align:center;
-}
-
-/* Breite der Eingabe für Betrag 1 reduzieren und zentrieren */
-
-.amount1 {
-  /* Verringern Sie die Breite der Betragsfelder, sodass sie schmaler wirken. */
-  /* 60 % der Zellenbreite in Kombination mit einer maximalen Breite von 120 px
-     ist kompakt, sodass längere Texte dennoch sichtbar bleiben. */
-  width: 60%;
-  max-width: 120px;
-  display: block;
-  margin: 0 auto;
-}
-
-/* Zweites Betragsfeld mit gleicher Breite wie Betrag 1 */
-.amount2 {
+.amount1,
+.amount2,
+.amountTip {
+  background-color: #f3f4f6;
+  box-sizing: border-box;
+  padding: 8px;
+  border: 1px solid black;
+  text-align: center;
   width: 60%;
   max-width: 120px;
   min-width: 60px;
   display: block;
-  margin: 0 auto; /* exakt gleiche vertikale Ausrichtung wie Betrag 1 */
+  margin: 0 auto;
+}
+.toggle-tip {
+  margin-left: 4px;
 }
 
 /* Zellen der Eingabezeilen oben ausrichten, damit Betrag 1 und Betrag 2
@@ -74,32 +64,48 @@ tr.entry-row td {
 }
 
 .amount1-wrapper input.amount1 {
+  font-size: 1.08em;
   min-width: 0;
   padding-right: 4px;
 }
 
 /* Standardbetrag-Button links neben dem Feld */
 .std-amount-btn {
-  width: 22px;
-  height: 22px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   border: 1px solid #999;
-  background: #f7f7f7;
-  font-size: 0.7em;
-  line-height: 1;
+  background: #ffffff;
+  font-size: 0.9em;
+  font-weight: 700;
   cursor: pointer;
-  display: none; /* wird nur bei aktiver Zeile angezeigt */
+  display: inline-flex; /* Platz immer reservieren → kein Springen */
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
   align-items: center;
   justify-content: center;
   padding: 0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+  transition: background-color 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease, transform 0.08s ease, opacity 0.08s ease;
+}
+
+.std-amount-btn:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
 }
 
 .std-amount-btn.visible {
-  display: inline-flex;
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .std-amount-btn:hover {
-  background: #e0e0e0;
+  background: #eef2ff;
+  border-color: #6b8cff;
+  box-shadow: 0 3px 7px rgba(0,0,0,0.16);
+  transform: translateY(-1px);
 }
 
 .copy-prev-amount {
@@ -146,9 +152,7 @@ tr.entry-row td {
 }
 
 .empty-input { background-color:lightgray; }
-.amount1:not(.empty-input),
-.amount2:not(.empty-input),
-#total-tip:not(.empty-input) {
+.amount1:not(.empty-input) {
   font-weight: bold;
 }
 
@@ -176,6 +180,38 @@ tr.entry-row td {
 }
 
 /* Druckmodus optimieren */
+
+#main-table th:nth-child(2),
+#main-table td:nth-child(2) {
+  width: 120px;
+}
+
+#main-table th:nth-child(3),
+#main-table td:nth-child(3) {
+  width: 90px;
+}
+
+#main-table th:nth-child(4),
+#main-table td:nth-child(4) {
+  width: 80px;
+}
+
+
+input[type="text"] {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 4px 6px;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
+}
+
+input[type="text"]:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.35);
+  background-color: #eff6ff;
+}
+
 @media print {
   button, input[type=file] {
     display:none !important;
@@ -266,6 +302,72 @@ input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+
+.modern-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.95em;
+  font-weight: 600;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.35);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.18s ease;
+}
+
+.modern-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.35);
+  filter: brightness(1.04);
+}
+
+.modern-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.3);
+  filter: brightness(0.96);
+}
+
+.modern-btn:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
+}
+.excel-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.95em;
+  font-weight: 600;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.35);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.18s ease;
+}
+
+.excel-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.35);
+  filter: brightness(1.05);
+}
+
+.excel-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.3);
+  filter: brightness(0.95);
+}
+
+.excel-btn:focus-visible {
+  outline: 2px solid #bbf7d0;
+  outline-offset: 2px;
+}
+
 input[type="number"] {
   -moz-appearance: textfield; /* für Firefox */
 }
@@ -296,7 +398,12 @@ tbody[id^="day-"] tr {
 
 /* Inputs bleiben sichtbar, aber dezent */
 tbody[id^="day-"] input {
-  border: 1px solid #ccc;
+  border: 1px solid #9ca3af;
+  border-radius: 6px;
+  padding: 4px 6px;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.12);
+  background-color: #ffffff;
+
 }
 
 
@@ -327,24 +434,15 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 }
 
 
-/* Steuerleiste unter der Tabelle */
-.controls { margin-top: 20px; }
-.controls-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
+.tg-cell {
+  min-width: 60px;
 }
-.controls-row.top { justify-content: flex-start; }
-.controls-row.bottom { justify-content: flex-start; margin-top: 12px; }
-.controls-row.bottom .back-area { flex: 1 1 auto; display: flex; justify-content: center; }
-.controls-row.bottom .danger-area { flex: 0 0 auto; display: flex; justify-content: flex-end; margin-left: auto; }
-button.danger-btn {
-  border: 2px solid #b30000;
-  background: #ffecec;
-  font-weight: bold;
+
+.amount1 {
+  font-size: 1.08em;
+  box-shadow: 0 0 10px rgba(37, 99, 235, 0.65);
+  border-radius: 6px;
 }
-button.danger-btn:hover { background: #ffd6d6; }
 </style>
 <script>
 // --- Globale Variablen ---
@@ -476,6 +574,31 @@ function toggleAmount2(btn, day){
 }
 
 
+function toggleTipUI(btn){
+  const wrapper = btn.parentElement.querySelector(".amountTip-wrapper");
+  const input = wrapper ? wrapper.querySelector(".amountTip") : null;
+  if (wrapper && input) {
+    if (wrapper.style.display === "none" || wrapper.style.display === "") {
+      // Feld einblenden
+      wrapper.style.display = "block";
+      btn.textContent = "− TG";
+      input.focus();
+    } else {
+      // Feld ausblenden und Wert löschen
+      wrapper.style.display = "none";
+      input.value = "";
+      checkInput(input);
+      btn.textContent = "+ TG";
+      const row = btn.closest("tr.entry-row");
+      const day = getDayFromEntryRow(row);
+      if (day !== null) {
+        updateDay(day);
+      }
+    }
+  }
+  updateAmount2ButtonsVisibility();
+}
+
 let currentAmount1Row = null;
 
 // Wird aufgerufen, wenn ein Betrag-1-Feld den Fokus erhält.
@@ -491,49 +614,57 @@ function setCurrentAmount1Row(input){
 // Grundlogik:
 //  - Wenn in einer Zeile Betrag 2 bereits gefüllt/aktiv ist → Button immer sichtbar.
 //  - Sonst: Button nur in der aktuell fokussierten Zeile sichtbar.
+
 function updateAmount2ButtonsVisibility(){
   const rows = document.querySelectorAll("tr.entry-row");
   rows.forEach(row => {
     const btn = row.querySelector(".toggle-amount2");
-    const wrapper = row.querySelector(".amount2-wrapper");
-    const a2 = row.querySelector(".amount2");
     const copyBtn = row.querySelector(".copy-prev-amount");
-    const stdBtn = row.querySelector(".std-amount-btn");
+    const stdBtns = row.querySelectorAll(".std-amount-btn");
+    const tipBtn = row.querySelector(".toggle-tip");
 
+    // Betrag-2-Schalter: nur in der aktiven Zeile sichtbar
     if (btn) {
-      const hasAmount2 = a2 && a2.value !== "";
-      const wrapperVisible = wrapper && wrapper.style.display !== "none" && wrapper.style.display !== "";
-
-      if (hasAmount2 || wrapperVisible) {
-        // Betrag 2 ist aktiv → Button (meist "− Betrag 2") immer anzeigen
-        btn.style.display = "inline-block";
-      } else if (row === currentAmount1Row) {
-        // Aktuelle Zeile ohne Betrag 2 → "+ Betrag 2" anzeigen
+      if (row === currentAmount1Row) {
         btn.style.display = "inline-block";
       } else {
-        // Andere Zeilen ohne Betrag 2 → Button verbergen
         btn.style.display = "none";
       }
     }
 
-    // Wiederhol-Button (↺) nur in der aktuell aktiven Zeile anzeigen.
+    // Wiederhol-Button (↺): nur in der aktiven Zeile und nicht in der allerersten Zeile
     if (copyBtn) {
       const allRows = Array.from(document.querySelectorAll('tbody[id^="day-"] tr.entry-row'));
       const isFirstGlobal = allRows.length > 0 && allRows[0] === row;
 
       if (row === currentAmount1Row) {
-        if (!isFirstGlobal) copyBtn.style.display = "inline-block"; else copyBtn.style.display = "none";
+        if (!isFirstGlobal) {
+          copyBtn.style.display = "inline-block";
+        } else {
+          copyBtn.style.display = "none";
+        }
       } else {
         copyBtn.style.display = "none";
       }
     }
 
-    // Standardbetrag-Button nur in der aktuell aktiven Zeile anzeigen.
-    if (stdBtn) {
+    // Standardbetrag-Buttons (22 / 33): alle in der aktiven Zeile sichtbar
+    if (stdBtns && stdBtns.length) {
+      stdBtns.forEach(stdBtn => {
+        if (row === currentAmount1Row) {
+          stdBtn.classList.add("visible");
+        } else {
+          stdBtn.classList.remove("visible");
+        }
+      });
+    }
+
+    // TG-Button: nur in der aktiven Zeile sichtbar
+    if (tipBtn) {
       if (row === currentAmount1Row) {
-        stdBtn.classList.add("visible");
+        tipBtn.style.display = "inline-block";
       } else {
-        stdBtn.classList.remove("visible");
+        tipBtn.style.display = "none";
       }
     }
   });
@@ -629,6 +760,14 @@ function handleExit(e){
   }
 }
 
+// Enter/Tab auch im Trinkgeld-Feld wie in Betrag 1/2 behandeln
+document.addEventListener('keydown', function(e) {
+  const t = e.target;
+  if (t && t.classList && t.classList.contains('amountTip')) {
+    handleEnter(e);
+  }
+});
+
 // Eigene freie Tage speichern / lesen. Bei einem Klick kann der Benutzer wählen,
 // ob der Tag als Urlaubstag oder Krankheitstag markiert werden soll. Bei erneutem
 // Klick wird die Markierung entfernt. Die Auswahl wird unter dem Schlüssel
@@ -698,9 +837,13 @@ function dayHasAnyEntry(day) {
   for (const row of rows) {
     const a1Str = row.querySelector(".amount1")?.value || "";
     const a2Str = row.querySelector(".amount2")?.value || "";
+    const tipStr = row.querySelector(".amountTip")?.value || "";
     const num1 = parseFloat(String(a1Str).replace(",", "."));
     const num2 = parseFloat(String(a2Str).replace(",", "."));
-    if ((!isNaN(num1) && num1 > 0) || (!isNaN(num2) && num2 > 0)) {
+    const numTip = parseFloat(String(tipStr).replace(",", "."));
+    if ((!isNaN(num1) && num1 > 0) ||
+        (!isNaN(num2) && num2 > 0) ||
+        (!isNaN(numTip) && numTip > 0)) {
       return true;
     }
   }
@@ -909,12 +1052,19 @@ function buildTable(){
       tb.innerHTML = `
         <tr class="entry-row">
           <td class="day-cell" onclick="toggleFreeDay(${day})">${day}</td>
-          <td><div class="amount1-wrapper"><button type="button" class="std-amount-btn" onclick="setStandardAmountForRow(this, 33, ${day})" title="33 € einfügen">33</button><input class="amount1 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)" onblur="handleExit(event)"></div></td>
+          <td><div class="amount1-wrapper"><button type="button" class="std-amount-btn" onclick="setStandardAmountForRow(this, 16, ${day})" title="16 € einfügen">16</button><button type="button" class="std-amount-btn" onclick="setStandardAmountForRow(this, 22, ${day})" title="22 € einfügen">22</button><button type="button" class="std-amount-btn" onclick="setStandardAmountForRow(this, 33, ${day})" title="33 € einfügen">33</button><input class="amount1 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)" onblur="handleExit(event)"></div></td>
           <td>
             <div class="amount2-wrapper" style="display:none;">
               <input class="amount2 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)" onblur="handleExit(event)">
             </div>
             <button type="button" class="toggle-amount2" style="display:none;" onclick="toggleAmount2(this, ${day})">+ Betrag 2</button>
+            
+          </td>
+          <td class="tg-cell">
+                        <div class="amountTip-wrapper" style="display:none;">
+              <input class="amountTip empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); (function(el){ const row = el.closest(\'tr.entry-row\'); const d = getDayFromEntryRow(row); if(d !== null){ updateDay(d); } })(this)">
+            </div>
+<button type="button" class="toggle-tip" style="display:none;" style="display:none;" onclick="toggleTipUI(this)">+ TG</button>
           </td>
           <td class="scroll-to-summary"></td>
           <td></td>
@@ -937,12 +1087,19 @@ function addRow(day){
   tr.classList.add("entry-row");
   tr.innerHTML = `
     <td></td>
-    <td><div class="amount1-wrapper"><button type="button" class="std-amount-btn" onclick="setStandardAmountForRow(this, 33, ${day})" title="33 € einfügen">33</button><input class="amount1 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)" onblur="handleExit(event)"></div></td>
+    <td><div class="amount1-wrapper"><button type="button" class="std-amount-btn" onclick="setStandardAmountForRow(this, 16, ${day})" title="16 € einfügen">16</button><button type="button" class="std-amount-btn" onclick="setStandardAmountForRow(this, 22, ${day})" title="22 € einfügen">22</button><button type="button" class="std-amount-btn" onclick="setStandardAmountForRow(this, 33, ${day})" title="33 € einfügen">33</button><input class="amount1 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)" onblur="handleExit(event)"></div></td>
     <td>
       <div class="amount2-wrapper" style="display:none;">
         <input class="amount2 empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); updateDay(${day})" onfocus="setCurrentAmount1Row(this)" onkeydown="handleEnter(event)" onblur="handleExit(event)">
       </div>
       <button type="button" class="toggle-amount2" style="display:none;" onclick="toggleAmount2(this, ${day})">+ Betrag 2</button>
+      
+    </td>
+    <td class="tg-cell">
+                  <div class="amountTip-wrapper" style="display:none;">
+              <input class="amountTip empty-input" type="number" step="0.01" lang="de" enterkeyhint="enter" oninput="checkInput(this); (function(el){ const row = el.closest(\'tr.entry-row\'); const d = getDayFromEntryRow(row); if(d !== null){ updateDay(d); } })(this)">
+            </div>
+<button type="button" class="toggle-tip" style="display:none;" style="display:none;" onclick="toggleTipUI(this)">+ TG</button>
     </td>
     <td class="scroll-to-summary"></td>
     <td></td>`;
@@ -964,11 +1121,6 @@ function dayKey(day){
   return "day-" + selYear + "-" + selMonth + "-" + day;
 }
 
-// Monatsspezifischer Schlüssel für Trinkgeld
-function tipKey(){
-  return "totalTip-" + selYear + "-" + selMonth;
-}
-
 // Tag neu berechnen und speichern
 function updateDay(day){
   let sum = 0;
@@ -976,8 +1128,9 @@ function updateDay(day){
   document.querySelectorAll("#day-" + day + " .entry-row").forEach(row => {
     const a1 = parseFloat(row.querySelector(".amount1")?.value) || 0;
     const a2 = parseFloat(row.querySelector(".amount2")?.value) || 0;
-    if(a1 > 0 || a2 > 0) customers++;
-    sum += a1 + a2;
+    const tip = parseFloat(row.querySelector(".amountTip")?.value) || 0;
+    if(a1 > 0 || a2 > 0 || tip > 0) customers++;
+    sum += a1 + a2 + tip;
   });
   document.getElementById("sum-" + day).innerText = sum > 0 ? sum.toFixed(2) : "";
   document.getElementById("cnt-" + day).innerText = customers > 0 ? customers : "";
@@ -1003,7 +1156,8 @@ function updateDay(day){
 function saveDay(day){
   const rows = [...document.querySelectorAll("#day-" + day + " .entry-row")].map(row => ({
     amount1: row.querySelector(".amount1")?.value || "",
-    amount2: row.querySelector(".amount2")?.value || ""
+    amount2: row.querySelector(".amount2")?.value || "",
+    amountTip: row.querySelector(".amountTip")?.value || ""
   }));
   localStorage.setItem(dayKey(day), JSON.stringify(rows));
 }
@@ -1011,31 +1165,31 @@ function saveDay(day){
 function loadDay(day){
   const raw = localStorage.getItem(dayKey(day));
   if(!raw) return;
-  let rows;
-  try {
-    rows = JSON.parse(raw);
-  } catch (err) {
-    console.warn("Ungültige gespeicherte Daten für ", dayKey(day), err);
-    // Daten nicht laden (Tip & Monat bleiben trotzdem korrekt)
-    return;
-  }
-  if(!Array.isArray(rows)) return;
+  const rows = JSON.parse(raw);
   const tb = document.getElementById("day-" + day);
   if(!tb) return;
-rows.forEach((r, idx) => {
+
+  rows.forEach((r, idx) => {
     if(idx > 0) addRow(day);
     const row = tb.querySelectorAll(".entry-row")[idx];
     const a1 = row.querySelector(".amount1");
     const a2 = row.querySelector(".amount2");
+    const tip = row.querySelector(".amountTip");
     const wrapper = row.querySelector(".amount2-wrapper");
     const toggleBtn = row.querySelector(".toggle-amount2");
+    const tipWrapper = row.querySelector(".amountTip-wrapper");
+    const tipBtn = row.querySelector(".toggle-tip");
 
     // Kompatibilität: sowohl amount1/amount2 als auch a1/a2 akzeptieren
     a1.value = r.amount1 !== undefined ? r.amount1 : (r.a1 || "");
     a2.value = r.amount2 !== undefined ? r.amount2 : (r.a2 || "");
+    if (tip) {
+      tip.value = r.amountTip !== undefined ? r.amountTip : "";
+    }
 
     checkInput(a1);
     checkInput(a2);
+    if (tip) checkInput(tip);
 
     if(wrapper){
       if(a2.value !== ""){
@@ -1046,34 +1200,34 @@ rows.forEach((r, idx) => {
         if(toggleBtn) toggleBtn.textContent = "+ Betrag 2";
       }
     }
+
+    if (tipWrapper && tip) {
+      if (tip.value !== "") {
+        tipWrapper.style.display = "block";
+        if (tipBtn) tipBtn.textContent = "− TG";
+      } else {
+        tipWrapper.style.display = "none";
+        if (tipBtn) tipBtn.textContent = "+ TG";
+      }
+    }
   });
 
   updateDay(day);
 }
 
 function loadAllDays(){
-  // Wichtig: Trinkgeld immer zuerst monatsbezogen laden,
-  // damit es NICHT „mitwandert“, falls es beim Laden einzelner Tage Fehler gibt.
-  const tip = document.getElementById("total-tip");
-  if (tip) {
-    tip.value = localStorage.getItem(tipKey()) || "";
-    checkInput(tip);
-  }
-
   for(let d = 1; d <= selDays; d++){
-    try {
-      loadDay(d);
-    } catch (err) {
-      console.warn("Fehler beim Laden von Tag "+d, err);
-    }
+    loadDay(d);
   }
   // Nach dem Laden aller Tage Buttons für Betrag 2 korrekt initialisieren
   updateAmount2ButtonsVisibility();
 }
+
 // Gesamtsummen
 function updateTotals(){
   let total = 0;
   let totalCustomers = 0;
+  let printedTotal = 0;
   for(let d = 1; d <= selDays; d++){
     const s = parseFloat(document.getElementById("sum-" + d)?.innerText) || 0;
     const c = parseInt(document.getElementById("cnt-" + d)?.innerText) || 0;
@@ -1084,18 +1238,9 @@ function updateTotals(){
   const grandCustomersEl = document.getElementById("grand-customers");
   if (grandCustomersEl) grandCustomersEl.innerText = totalCustomers;
 
-  const tipInput = document.getElementById("total-tip");
-  const tipStr = (tipInput && tipInput.value != null) ? String(tipInput.value).trim() : "";
-  // Trinkgeld pro Monat als TEXT speichern (z.B. "12,50"), damit beim Export/Import nichts verloren geht
-  localStorage.setItem(tipKey(), tipStr);
-  // Für Berechnungen deutsches Komma akzeptieren
-  const tip = parseFloat(tipStr.replace(",", ".")) || 0;
-const withTip = total + tip;
-  document.getElementById("with-tip").innerText = withTip.toFixed(2);
-
-  const net = withTip / 1.19;
+  const net = total / 1.19;
   document.getElementById("net-total").innerText = net.toFixed(2);
-  document.getElementById("tax-total").innerText = (withTip - net).toFixed(2);
+  document.getElementById("tax-total").innerText = (total - net).toFixed(2);
 
   // Beschriftung des Zurück-Pfeils abhängig davon, ob Daten vorhanden sind
   updateBackArrowLabel();
@@ -1103,145 +1248,43 @@ const withTip = total + tip;
 
 // JSON Export / Import
 function exportJSON(){
-  // Exportiert automatisch ALLE Monate, die Daten enthalten (Einnahmen, freie Tage oder Trinkgeld),
-  // nicht nur den aktuell ausgewählten Monat.
   const data = {
-    schema: "einnahmen-multi-month-v1",
-    exportedAt: new Date().toISOString(),
-    months: {}
+    year: selYear,
+    month: selMonth,
+    days: {},
+    free: {}
   };
 
-  // Hilfsfunktionen
-  const keyMatches = (k, y, m) => k.startsWith("day-" + y + "-" + m + "-");
-  const freeMatches = (k, y, m) => k.startsWith("cf-" + y + "-" + m + "-");
-  const parseNumber = (v) => {
-    const n = parseFloat(String(v || "").replace(",", "."));
-    return isNaN(n) ? 0 : n;
-  };
+  for(let d = 1; d <= selDays; d++){
+    const key = dayKey(d);
+    const raw = localStorage.getItem(key);
+    if(raw) data.days[key] = JSON.parse(raw);
 
-  // 1) Alle (Jahr,Monat) Kandidaten aus localStorage sammeln
-  const monthSet = new Set();
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (!k) continue;
-
-    let m1 = k.match(/^day-(\d+)-(\d+)-(\d+)$/);
-    if (m1) { monthSet.add(m1[1] + "-" + m1[2]); continue; }
-
-    let m2 = k.match(/^cf-(\d+)-(\d+)-(\d+)$/);
-    if (m2) { monthSet.add(m2[1] + "-" + m2[2]); continue; }
-
-    let m3 = k.match(/^totalTip-(\d+)-(\d+)$/);
-    if (m3) {
-      const tipVal = (localStorage.getItem(k) || "").trim();
-      if (tipVal !== "") monthSet.add(m3[1] + "-" + m3[2]);
-      continue;
-    }
+    const cf = "cf-" + selYear + "-" + selMonth + "-" + d;
+    const freeVal = localStorage.getItem(cf);
+    if(freeVal) data.free[cf] = freeVal;
   }
 
-  const monthList = Array.from(monthSet)
-    .map(s => {
-      const [y, m] = s.split("-").map(n => parseInt(n, 10));
-      return { year: y, month: m };
-    })
-    .filter(x => !isNaN(x.year) && !isNaN(x.month))
-    .sort((a,b) => (a.year - b.year) || (a.month - b.month));
-
-  // 2) Pro Monat Daten sammeln – aber nur, wenn der Monat wirklich "Daten enthält"
-  monthList.forEach(({year, month}) => {
-    const monthData = { year, month, days: {}, free: {}, totalTip: "" };
-    let hasMeaningfulData = false;
-
-    // Tage
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!k) continue;
-      if (!keyMatches(k, year, month)) continue;
-
-      const raw = localStorage.getItem(k);
-      if (!raw) continue;
-
-      // Speichern
-      try {
-        const rows = JSON.parse(raw);
-
-        // Tag nur exportieren, wenn in diesem Tag wirklich ein Betrag eingetragen ist.
-        let dayHasData = false;
-        if (Array.isArray(rows)) {
-          for (const r of rows) {
-            const a1 = (r && (r.amount1 ?? r.a1)) ?? "";
-            const a2 = (r && (r.amount2 ?? r.a2)) ?? "";
-            if (String(a1).trim() !== "" || String(a2).trim() !== "") {
-              const n1 = parseNumber(a1);
-              const n2 = parseNumber(a2);
-              if (n1 !== 0 || n2 !== 0 || String(a1).trim() !== "" || String(a2).trim() !== "") {
-                dayHasData = true;
-                break;
-              }
-            }
-          }
-        }
-
-        if (dayHasData) {
-          monthData.days[k] = rows;
-          hasMeaningfulData = true;
-        }
-      } catch (e) {
-        // Ungültige Daten ignorieren (nicht exportieren)
-      }
-
-      if (hasMeaningfulData) {
-        // nicht breaken: wir wollen trotzdem alle day-Keys exportieren
-      }
-    }
-
-    // Freie Tage
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!k) continue;
-      if (!freeMatches(k, year, month)) continue;
-
-      const val = localStorage.getItem(k);
-      if (val !== null && String(val).trim() !== "") {
-        monthData.free[k] = val;
-        hasMeaningfulData = true;
-      }
-    }
-
-    // Trinkgeld
-    const tKey = "totalTip-" + year + "-" + month;
-    const tipStr = (localStorage.getItem(tKey) || "").trim();
-    monthData.totalTip = tipStr;
-    if (tipStr !== "") {
-      hasMeaningfulData = true;
-    }
-
-    // Monat nur aufnehmen, wenn er Daten enthält
-    if (hasMeaningfulData) {
-      data.months[year + "-" + month] = monthData;
-    }
-  });
-
-  const monthCount = Object.keys(data.months).length;
-
   // Standard-Dateinamen vorschlagen
-  const today = new Date();
-  const isoDate = today.toISOString().slice(0,10); // YYYY-MM-DD
-  const defaultName = "einnahmen_backup_" + isoDate + ".json";
+  const defaultName = "einnahmen_" + selYear + "-" + String(selMonth+1).padStart(2,"0") + ".json";
 
-  const message =
-    "Es werden alle Monate gespeichert, die Daten enthalten.\n\n" +
-    "Gefundene Monate: " + monthCount + "\n\n" +
-    "Die Datei wird in Ihrem Standard-Download-Ordner gespeichert (z.B. 'Downloads').\n\n" +
-    "Vorgeschlagener Dateiname:\n" + defaultName + "\n\n" +
-    "Sie können den Dateinamen hier ändern oder einfach mit OK bestätigen.";
+  // Hinweis, wo gespeichert wird, und Möglichkeit zur Umbenennung
+  const message = "Die Datei wird in Ihrem Standard-Download-Ordner gespeichert (z.B. 'Downloads').\n\n"
+    + "Vorgeschlagener Dateiname:\n" + defaultName + "\n\n"
+    + "Sie können den Dateinamen hier ändern oder einfach mit OK bestätigen.";
 
   let filename = prompt(message, defaultName);
-  if (filename === null) return;
-
+  if (filename === null) {
+    // Benutzer hat Abbrechen gewählt → nicht speichern
+    return;
+  }
   filename = filename.trim();
-  if (!filename) filename = defaultName;
-  if (!filename.toLowerCase().endsWith(".json")) filename += ".json";
+  if (!filename) {
+    filename = defaultName;
+  }
+  if (!filename.toLowerCase().endsWith(".json")) {
+    filename += ".json";
+  }
 
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
   const url = URL.createObjectURL(blob);
@@ -1260,49 +1303,6 @@ function importJSON(ev){
   reader.onload = e => {
     try{
       const data = JSON.parse(e.target.result);
-
-      // Neu: Multi-Monats-Format (einnahmen-multi-month-v1)
-      if (data && data.months && typeof data.months === "object") {
-        for (const mk in data.months) {
-          const m = data.months[mk];
-          if (!m) continue;
-
-          // Tage
-          if (m.days && typeof m.days === "object") {
-            for (const key in m.days) {
-              localStorage.setItem(key, JSON.stringify(m.days[key]));
-            }
-          }
-
-          // Freie Tage (Urlaub/Krank)
-          if (m.free && typeof m.free === "object") {
-            for (const key in m.free) {
-              const val = m.free[key];
-              // Ältere Exporte speicherten nur "1" → standardmäßig als "urlaub" interpretieren
-              if(val === 1 || val === "1" || val === true){
-                localStorage.setItem(key, "urlaub");
-              } else if(val === "urlaub" || val === "krank") {
-                localStorage.setItem(key, val);
-              } else {
-                // Unbekannte Werte ebenfalls als Urlaub behandeln, damit zyklisches Umschalten funktioniert
-                localStorage.setItem(key, "urlaub");
-              }
-            }
-          }
-
-          // Trinkgeld je Monat
-          if (m.year !== undefined && m.month !== undefined && m.totalTip !== undefined) {
-            const tKey = "totalTip-" + m.year + "-" + m.month;
-            localStorage.setItem(tKey, m.totalTip);
-          }
-        }
-
-        alert("Import erfolgreich (alle Monate). Seite wird neu geladen.");
-        location.reload();
-        return;
-      }
-
-      // Alt: Ein-Monats-Format (bisheriger Export)
       if(data.days){
         for(const key in data.days){
           localStorage.setItem(key, JSON.stringify(data.days[key]));
@@ -1311,21 +1311,17 @@ function importJSON(ev){
       if(data.free){
         for(const key in data.free){
           const val = data.free[key];
+          // Ältere Exporte speicherten nur "1" → standardmäßig als "urlaub" interpretieren
           if(val === 1 || val === "1" || val === true){
             localStorage.setItem(key, "urlaub");
           } else if(val === "urlaub" || val === "krank") {
             localStorage.setItem(key, val);
           } else {
+            // Unbekannte Werte ebenfalls als Urlaub behandeln, damit zyklisches Umschalten funktioniert
             localStorage.setItem(key, "urlaub");
           }
         }
       }
-      if(data.totalTip !== undefined){
-        // Hinweis: Im alten Format wird Trinkgeld unter dem Schlüssel des aktuell gewählten Monats gespeichert.
-        // Das bleibt aus Kompatibilitätsgründen so.
-        localStorage.setItem(tipKey(), data.totalTip);
-      }
-
       alert("Import erfolgreich. Seite wird neu geladen.");
       location.reload();
     }catch(err){
@@ -1353,8 +1349,7 @@ function clearAllData(){
     year: selYear,
     month: selMonth,
     days: {},
-    free: {},
-    totalTip: localStorage.getItem(tipKey()) || ""
+    free: {}
   };
 
   for (let d = 1; d <= selDays; d++) {
@@ -1389,7 +1384,7 @@ function clearAllData(){
     const cf = "cf-" + selYear + "-" + selMonth + "-" + d;
     localStorage.removeItem(cf);
   }
-  localStorage.removeItem(tipKey());
+  localStorage.removeItem("totalTip");
 
   alert("Backup erstellt. Alle Daten für den Monat " + monthLabel + " wurden gelöscht.");
   location.reload();
@@ -1500,7 +1495,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V159</h1>
+<h1>Einnahmen V217</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span><span id="month-lock-toggle" onclick="toggleLock()" style="cursor:pointer; font-size: 1.4em; margin-left: 10px;" title="Monat bearbeiten/sperren">🔓</span>
@@ -1511,7 +1506,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <tr>
 <th>Tag</th>
 <th>Betrag 1</th>
-<th>Betrag 2</th>
+<th>Betrag 2</th><th>TG</th>
 <th>Summe</th>
 <th>Kunden</th>
 </tr>
@@ -1530,32 +1525,63 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <td id="grand-customers" style="font-weight: bold;">0</td>
 </tr>
 </table>
-<div class="controls">
-  <div class="controls-row top">
-    <button onclick="generateReducedPrint()">🖨️ Reduzierter Druck</button>
-    <button onclick="exportJSON()">Alle Monate speichern</button>
-    <input accept="application/json" id="data-file-input" onchange="importJSON(event)" style="display:none;" type="file"/>
-    <button onclick="document.getElementById('data-file-input').click()">Datei laden</button>
-    <button onclick="exportExcel()">📊 Excel speichern</button>
+
+<div style="margin-top:20px;">
+  <div id="primary-controls" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+    <button class="modern-btn" onclick="generateReducedPrint()">🖨️ Reduzierter Druck</button>
+    <button class="modern-btn" onclick="exportJSON()">Datei speichern</button>
   </div>
 
-  <div class="controls-row bottom">
-    <div class="back-area">
-      <span class="scroll-back-wrapper" title="Zum letzten Eintrag springen">
-        <span class="scroll-circle">↑</span><span class="scroll-text"> zum letzten Eintrag</span>
-      </span>
-    </div>
-    <div class="danger-area">
-      <button class="danger-btn" onclick="clearAllData()">🗑️ Daten dieses Monats löschen</button>
-    </div>
+  <!-- Schnell-Zurück: immer sichtbar -->
+  <div style="margin-top:4px; text-align:right; padding-right:10px;">
+  <span class="scroll-back-wrapper" title="Zum letzten Eintrag springen">
+    <span class="scroll-circle">↑</span><span class="scroll-text"> zum letzten Eintrag</span>
+  </span>
+</div>
+
+  <div id="advanced-controls" style="display:none; margin-top:10px;">
+    
+<input accept="application/json" id="data-file-input" onchange="importJSON(event)" style="display:none;" type="file"/>
+<button onclick="document.getElementById('data-file-input').click()">Datei laden</button>
+<div style="display:inline-block; margin-left:10px;">
+  <button onclick="clearAllData()">Alle Daten löschen</button>
+</div>
+
+
+<div style="margin-top:10px;">
+  <label for="quarter-select">Quartal:</label>
+  <select id="quarter-select">
+    <option value="1">Q1 (Jan–Mär)</option>
+    <option value="2">Q2 (Apr–Jun)</option>
+    <option value="3">Q3 (Jul–Sep)</option>
+    <option value="4">Q4 (Okt–Dez)</option>
+  </select>
+  <div style="display:inline-block; margin-left:10px;">
+    <button class="modern-btn" onclick="generateQuarterReducedPrint()">🖨️ Quartal drucken</button>
+    <br/>
+    <button class="modern-btn" onclick="generateYearOverview()" style="margin-top:6px;">🧮 Jahresübersicht drucken</button>
+  </div>
+  <div style="display:inline-block; margin-left:10px;">
+    <button class="excel-btn" onclick="exportQuarterExcel()">📊 Quartal Excel</button>
+    <br/>
+    <button class="excel-btn" onclick="exportExcel()" style="margin-top:6px;">📊 Excel speichern</button>
+  </div>
+</div>
+
+  </div>
+
+  <div id="admin-code-wrapper" style="margin-top:8px; text-align:right; padding-right:10px;">
+    <label for="unlock-code" style="font-size:0.9em; font-weight:bold;">Code:</label>
+    <input id="unlock-code" type="password" inputmode="numeric" maxlength="4"
+           style="width:90px; text-align:center; margin-left:6px; padding:4px 6px;"
+           placeholder="••••" autocomplete="off" />
+    <span style="font-size:0.85em; margin-left:6px; opacity:0.85;">(weitere Funktionen)</span>
   </div>
 </div>
 <div id="onscreen-totals" style="margin-top:20px;">
 <h3>Monatsübersicht</h3>
 <table>
 <tr><th>Gesamtsumme</th><td id="grand-total"></td></tr>
-<tr><th>Trinkgeld</th><td><input id="total-tip" style="width: 80px;" oninput="checkInput(this); updateTotals()"/></td></tr>
-<tr><th>Summe inkl. Trinkgeld</th><td id="with-tip"></td></tr>
 <tr><th>Netto</th><td id="net-total"></td></tr>
 <tr><th>MwSt</th><td id="tax-total"></td></tr>
 </table>
@@ -1564,8 +1590,6 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <h3>Monatsübersicht (Druck)</h3>
 <table>
 <tr><th>Gesamtsumme</th><td id="grand-total-print"></td></tr>
-<tr><th>Trinkgeld</th><td id="tip-print"></td></tr>
-<tr><th>Summe inkl. Trinkgeld</th><td id="with-tip-print"></td></tr>
 <tr><th>Netto</th><td id="net-total-print"></td></tr>
 <tr><th>MwSt</th><td id="tax-total-print"></td></tr>
 </table>
@@ -1579,6 +1603,286 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
  * textbasierte Tabelle und öffnet den Browser-Druckdialog. Es wird
  * außerdem die Gesamtanzahl aller Kunden am Monatsende ausgegeben.
  */
+
+function getSelectedQuarter() {
+  const sel = document.getElementById("quarter-select");
+  let q = sel ? parseInt(sel.value, 10) : NaN;
+  if (!(q >= 1 && q <= 4)) {
+    q = Math.floor(selMonth / 3) + 1;
+  }
+  return q;
+}
+
+function getQuarterMonths(q) {
+  const start = (q - 1) * 3;
+  return [start, start + 1, start + 2];
+}
+
+function generateQuarterReducedPrint() {
+  const q = getSelectedQuarter();
+  const months = getQuarterMonths(q);
+  const year = selYear;
+  let output = "";
+  let total = 0;
+  let totalCustomers = 0;
+  let printedTotal = 0;
+
+  months.forEach(m => {
+    output += "Einnahmen " + monthNames[m] + " " + year + "\n\n";
+    const days = daysInMonth(year, m);
+    for (let d = 1; d <= days; d++) {
+      const key = "day-" + year + "-" + m + "-" + d;
+      let rows = [];
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        try { rows = JSON.parse(raw); } catch (e) { rows = []; }
+      }
+
+      const freeKey = "cf-" + year + "-" + m + "-" + d;
+      const freeType = localStorage.getItem(freeKey);
+
+      const hasEntries = rows && rows.some(r => {
+        const a1 = r.amount1 !== undefined ? r.amount1 : (r.a1 || "");
+        const a2 = r.amount2 !== undefined ? r.amount2 : (r.a2 || "");
+        const tip = r.amountTip !== undefined ? r.amountTip : "";
+        return (a1 && parseFloat(String(a1).replace(",", ".")) > 0) ||
+               (a2 && parseFloat(String(a2).replace(",", ".")) > 0) ||
+               (tip && parseFloat(String(tip).replace(",", ".")) > 0);
+      });
+
+      if (!hasEntries && freeType) {
+        const dateStr = String(d).padStart(2, "0") + "." + String(m + 1).padStart(2, "0") + "." + year;
+        const label = freeType === "urlaub"
+          ? "Urlaubstag"
+          : (freeType === "krank" ? "Krankheitstag" : "Eigener freier Tag");
+        output += dateStr.padEnd(12) + label + "\n\n";
+        continue;
+      }
+
+      let tagSum = 0;
+      let kunden = 0;
+      let zeilen = [];
+
+      if (rows && rows.length) {
+        rows.forEach(r => {
+          const a1Str = r.amount1 !== undefined ? r.amount1 : (r.a1 || "");
+          const a2Str = r.amount2 !== undefined ? r.amount2 : (r.a2 || "");
+          const tipStr = r.amountTip !== undefined ? r.amountTip : "";
+          const num1 = parseFloat(String(a1Str).replace(",", "."));
+          const num2 = parseFloat(String(a2Str).replace(",", "."));
+          const numTip = parseFloat(String(tipStr).replace(",", "."));
+          const sumVal =
+            (isNaN(num1) ? 0 : num1) +
+            (isNaN(num2) ? 0 : num2) +
+            (isNaN(numTip) ? 0 : numTip);
+          if (sumVal > 0) {
+            kunden++;
+            const fmt = n => n.toFixed(2).replace(".", ",");
+            const formattedSum = fmt(sumVal);
+            const fmt1 = !isNaN(num1) ? fmt(num1) : "";
+            const fmt2 = !isNaN(num2) && num2 > 0 ? fmt(num2) : "";
+            const fmtTip = !isNaN(numTip) && numTip > 0 ? "Trinkgeld " + fmt(numTip) : "";
+            let parts = [];
+            if (fmt1) parts.push(fmt1);
+            if (fmt2) parts.push(fmt2);
+            if (fmtTip) parts.push(fmtTip);
+            let line;
+            if (parts.length > 1) {
+              line = formattedSum.padStart(10) + "   " + parts.join(" + ");
+            } else {
+              line = formattedSum.padStart(10);
+            }
+            zeilen.push(line);
+            tagSum += sumVal;
+          }
+        });
+      }
+
+      if (tagSum > 0) {
+        const dateStr = String(d).padStart(2, "0") + "." + String(m + 1).padStart(2, "0") + "." + year;
+        const maxLines = Math.max(zeilen.length, 1);
+        for (let i = 0; i < maxLines; i++) {
+          const datum = i === 0 ? dateStr.padEnd(12) : " ".repeat(12);
+          const einnahme = zeilen[i] || "";
+          output += datum + einnahme + "\n";
+        }
+        output += " ".repeat(12) + "----------\n";
+        output += " ".repeat(12) + tagSum.toFixed(2).replace(".", ",").padStart(10) + "   |   " + kunden + " Kunden\n\n";
+        const roundedDay = Math.round(tagSum * 100) / 100;
+        printedTotal += roundedDay;
+        total += tagSum;
+        totalCustomers += kunden;
+      }
+    }
+    output += "\n";
+  });
+
+  const netto = total / 1.19;
+  const mwst = total - netto;
+  const roundedTotal = Math.round(printedTotal * 100) / 100;
+  const roundingDiff = Math.round((roundedTotal - total) * 100) / 100;
+  const labelWidth = 24;
+  function line(label, value) {
+    return label.padEnd(labelWidth) + value.toFixed(2).replace(".", ",").padStart(10) + "\n\n";
+  }
+  output += "Quartalsübersicht (Q" + q + " " + year + ")\n";
+  output += line("Summe Tagessummen:", roundedTotal);
+  output += line("Exakte Gesamtsumme:", total);
+  output += line("Rundungsdifferenz:", roundingDiff);
+  output += line("Netto:", netto);
+  output += line("MwSt (19%):", mwst);
+  output += ("Gesamtanzahl Kunden:".padEnd(labelWidth) + String(totalCustomers).padStart(10) + "\n");
+
+  const rp = document.getElementById("reduced-print");
+  if (rp) {
+    rp.innerText = output;
+    rp.style.display = "block";
+    setTimeout(() => {
+      window.print();
+      rp.style.display = "none";
+    }, 100);
+  }
+}
+
+function exportQuarterExcel() {
+  const q = getSelectedQuarter();
+  const months = getQuarterMonths(q);
+  const year = selYear;
+  const wb = XLSX.utils.book_new();
+  const ws_data = [];
+  let grandTotal = 0;
+  let grandCustomers = 0;
+
+  months.forEach(m => {
+    const days = daysInMonth(year, m);
+    let monthTotal = 0;
+    let monthCustomers = 0;
+
+    ws_data.push([]);
+    ws_data.push([monthNames[m] + " " + year]);
+
+    for (let d = 1; d <= days; d++) {
+      const dateStr = String(d).padStart(2, "0") + "." + String(m + 1).padStart(2, "0") + "." + year;
+      const key = "day-" + year + "-" + m + "-" + d;
+      let rows = [];
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        try { rows = JSON.parse(raw); } catch (e) { rows = []; }
+      }
+
+      const freeKey = "cf-" + year + "-" + m + "-" + d;
+      const freeType = localStorage.getItem(freeKey);
+
+      const hasEntries = rows && rows.some(r => {
+        const a1 = r.amount1 !== undefined ? r.amount1 : (r.a1 || "");
+        const a2 = r.amount2 !== undefined ? r.amount2 : (r.a2 || "");
+        const tip = r.amountTip !== undefined ? r.amountTip : "";
+        return (a1 && parseFloat(String(a1).replace(",", ".")) > 0) ||
+               (a2 && parseFloat(String(a2).replace(",", ".")) > 0) ||
+               (tip && parseFloat(String(tip).replace(",", ".")) > 0);
+      });
+
+      if (!hasEntries && freeType) {
+        const label = freeType === "urlaub"
+          ? "Urlaubstag"
+          : (freeType === "krank" ? "Krankheitstag" : "Eigener freier Tag");
+        ws_data.push([dateStr, label]);
+        ws_data.push([]);
+        continue;
+      }
+
+      let tagSum = 0;
+      let kunden = 0;
+      const dayLines = [];
+
+      if (rows && rows.length) {
+        rows.forEach(r => {
+          const a1Str = r.amount1 !== undefined ? r.amount1 : (r.a1 || "");
+          const a2Str = r.amount2 !== undefined ? r.amount2 : (r.a2 || "");
+          const tipStr = r.amountTip !== undefined ? r.amountTip : "";
+          const num1 = parseFloat(String(a1Str).replace(",", "."));
+          const num2 = parseFloat(String(a2Str).replace(",", "."));
+          const numTip = parseFloat(String(tipStr).replace(",", "."));
+          const sumVal =
+            (isNaN(num1) ? 0 : num1) +
+            (isNaN(num2) ? 0 : num2) +
+            (isNaN(numTip) ? 0 : numTip);
+
+          if (sumVal > 0) {
+            kunden++;
+            const fmt = n => n.toFixed(2).replace(".", ",");
+            const formattedSum = fmt(sumVal);
+            const fmt1 = !isNaN(num1) ? fmt(num1) : "";
+            const fmt2 = !isNaN(num2) && num2 > 0 ? fmt(num2) : "";
+            const fmtTip = !isNaN(numTip) && numTip > 0 ? "Trinkgeld " + fmt(numTip) : "";
+
+            let parts = [];
+            if (fmt1) parts.push(fmt1);
+            if (fmt2) parts.push(fmt2);
+            if (fmtTip) parts.push(fmtTip);
+
+            if (parts.length > 1) {
+              dayLines.push(["", formattedSum, parts.join(" + ")]);
+            } else {
+              dayLines.push(["", formattedSum, ""]);
+            }
+            tagSum += sumVal;
+          }
+        });
+      }
+
+      if (tagSum > 0) {
+        
+dayLines.forEach((l, index) => {
+  if (index === 0) {
+    ws_data.push([dateStr, l[1], l[2]]);
+  } else {
+    ws_data.push(["", l[1], l[2]]);
+  }
+});
+
+        ws_data.push(["", "----------"]);
+        ws_data.push(["", tagSum.toFixed(2).replace(".", ","), `|   ${kunden} Kunden`]);
+        ws_data.push([]);
+        monthTotal += tagSum;
+        monthCustomers += kunden;
+      }
+    }
+
+    if (monthTotal > 0) {
+      const fmt = n => n.toFixed(2).replace(".", ",");
+      const netto = monthTotal / 1.19;
+      const mwst = monthTotal - netto;
+      ws_data.push([]);
+      ws_data.push(["Monatsübersicht " + monthNames[m] + " " + year]);
+      ws_data.push(["Gesamtsumme", fmt(monthTotal)]);
+      ws_data.push(["Netto", fmt(netto)]);
+      ws_data.push(["MwSt", fmt(mwst)]);
+      ws_data.push(["Gesamtanzahl Kunden", String(monthCustomers)]);
+      ws_data.push([]);
+    }
+
+    grandTotal += monthTotal;
+    grandCustomers += monthCustomers;
+  });
+
+  if (grandTotal > 0) {
+    const fmt = n => n.toFixed(2).replace(".", ",");
+    const netto = grandTotal / 1.19;
+    const mwst = grandTotal - netto;
+    ws_data.push([]);
+    ws_data.push([`Quartalsübersicht Q${q} ${year}`]);
+    ws_data.push(["Gesamtsumme", fmt(grandTotal)]);
+    ws_data.push(["Netto", fmt(netto)]);
+    ws_data.push(["MwSt", fmt(mwst)]);
+    ws_data.push(["Gesamtanzahl Kunden", String(grandCustomers)]);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(ws_data);
+  XLSX.utils.book_append_sheet(wb, ws, "Quartal");
+  const defaultName = `einnahmen_quartal_Q${q}_${year}.xlsx`;
+  XLSX.writeFile(wb, defaultName);
+}
 function generateReducedPrint() {
   let output = "";
   const month = document.getElementById("selected-month").innerText;
@@ -1586,6 +1890,7 @@ function generateReducedPrint() {
 
   let total = 0;
   let totalCustomers = 0;
+  let printedTotal = 0;
 
   for (let d = 1; d <= selDays; d++) {
     const tbody = document.getElementById("day-" + d);
@@ -1626,9 +1931,11 @@ function generateReducedPrint() {
       // Betragswerte als Strings auslesen und in Zahlen konvertieren
       const a1Str = r.querySelector(".amount1")?.value || "";
       const a2Str = r.querySelector(".amount2")?.value || "";
+      const tipStr = r.querySelector(".amountTip")?.value || "";
       const num1 = parseFloat(String(a1Str).replace(",", "."));
       const num2 = parseFloat(String(a2Str).replace(",", "."));
-      const sumVal = (isNaN(num1) ? 0 : num1) + (isNaN(num2) ? 0 : num2);
+      const numTip = parseFloat(String(tipStr).replace(",", "."));
+      const sumVal = (isNaN(num1) ? 0 : num1) + (isNaN(num2) ? 0 : num2) + (isNaN(numTip) ? 0 : numTip);
       if (sumVal > 0) {
         kunden++;
         // Formatierfunktion für zwei Dezimalstellen mit deutschem Dezimaltrennzeichen
@@ -1637,12 +1944,16 @@ function generateReducedPrint() {
         // formatierte Einzelbeträge
         const fmt1 = !isNaN(num1) ? fmt(num1) : "";
         const fmt2 = !isNaN(num2) && num2 > 0 ? fmt(num2) : "";
+        const fmtTip = !isNaN(numTip) && numTip > 0 ? "Trinkgeld " + fmt(numTip) : "";
         let line;
-        if (a2Str && fmt2) {
-          // Gesamtbetrag plus Einzelbeträge rechts daneben
-          line = formattedSum.padStart(10) + "   " + fmt1 + " + " + fmt2;
+        let parts = [];
+        if (fmt1) parts.push(fmt1);
+        if (fmt2) parts.push(fmt2);
+        if (fmtTip) parts.push(fmtTip);
+        if (parts.length > 1) {
+          line = formattedSum.padStart(10) + "   " + parts.join(" + ");
         } else {
-          line = fmt1.padStart(10);
+          line = formattedSum.padStart(10);
         }
         zeilen.push(line);
         tagSum += sumVal;
@@ -1662,29 +1973,32 @@ function generateReducedPrint() {
       output += " ".repeat(12) + "----------\n";
       output += " ".repeat(12) + tagSum.toFixed(2).replace(".", ",").padStart(10) + "   |   " + kunden + " Kunden\n\n";
 
+      const roundedDay = Math.round(tagSum * 100) / 100;
+      printedTotal += roundedDay;
       total += tagSum;
       totalCustomers += kunden;
     }
   }
 
-  // Trinkgeld, Netto, MwSt berechnen
-  const tip = parseFloat(document.getElementById("total-tip")?.value.replace(",", ".") || "0");
-  const withTip = total + tip;
-  const netto = withTip / 1.19;
-  const mwst = withTip - netto;
+  // Netto und MwSt aus der Gesamtsumme (inkl. Trinkgeld) berechnen
+  const netto = total / 1.19;
+  const mwst = total - netto;
 
-  const labelWidth = 24;
+    const roundedTotal = Math.round(printedTotal * 100) / 100;
+  const roundingDiff = Math.round((roundedTotal - total) * 100) / 100;
+
+const labelWidth = 24;
   // Helferfunktion für eine Zeile der Monatsübersicht
   function line(label, value) {
     return label.padEnd(labelWidth) + value.toFixed(2).replace(".", ",").padStart(10) + "\n\n";
   }
 
-  // Monatsübersicht
+  // Monatsübersicht (FA-optimiert mit Rundungsdifferenz)
   output += "Monatsübersicht\n";
   output += "----------------\n\n";
-  output += line("Gesamtsumme:", total);
-  output += line("Trinkgeld:", tip);
-  output += line("Summe inkl. Trinkgeld:", withTip);
+  output += line("Summe Tagessummen:", roundedTotal);
+  output += line("Exakte Gesamtsumme:", total);
+  output += line("Rundungsdifferenz:", roundingDiff);
   output += line("Netto:", netto);
   output += line("MwSt (19%):", mwst);
   // Gesamtanzahl der Kunden anhängen
@@ -1708,9 +2022,11 @@ function updateCustomerTotal() {
   rows.forEach(row => {
     const amount1 = row.querySelector(".amount1")?.value || "";
     const amount2 = row.querySelector(".amount2")?.value || "";
+    const tipVal = row.querySelector(".amountTip")?.value || "";
     let sum = 0;
     if (amount1) sum += parseFloat(amount1.replace(",", "."));
     if (amount2) sum += parseFloat(amount2.replace(",", "."));
+    if (tipVal) sum += parseFloat(tipVal.replace(",", "."));
     if (sum > 0) totalCustomers++;
   });
   const target = document.getElementById("grand-customers");
@@ -1719,10 +2035,20 @@ function updateCustomerTotal() {
 
 document.addEventListener("DOMContentLoaded", updateCustomerTotal);
 document.addEventListener("input", function(e) {
-  if (e.target.classList.contains("amount1") || e.target.classList.contains("amount2")) {
+  if (e.target.classList.contains("amount1") ||
+      e.target.classList.contains("amount2") ||
+      e.target.classList.contains("amountTip")) {
+
     updateCustomerTotal();
+
+    const row = e.target.closest("tr.entry-row");
+    const day = getDayFromEntryRow(row);
+    if (day !== null) {
+      updateDay(day);
+    }
   }
 });
+
 
 // Delegate click events for scroll-to-summary elements to smoothly scroll to the monthly totals
 document.addEventListener('click', function(event) {
@@ -1989,10 +2315,15 @@ function exportExcel() {
     rows.forEach(r => {
       const a1Str = r.querySelector(".amount1")?.value || "";
       const a2Str = r.querySelector(".amount2")?.value || "";
+      const tipStr = r.querySelector(".amountTip")?.value || "";
 
       const num1 = parseFloat(String(a1Str).replace(",", "."));
       const num2 = parseFloat(String(a2Str).replace(",", "."));
-      const sumVal = (isNaN(num1) ? 0 : num1) + (isNaN(num2) ? 0 : num2);
+      const numTip = parseFloat(String(tipStr).replace(",", "."));
+      const sumVal =
+        (isNaN(num1) ? 0 : num1) +
+        (isNaN(num2) ? 0 : num2) +
+        (isNaN(numTip) ? 0 : numTip);
 
       if (sumVal > 0) {
         kunden++;
@@ -2000,11 +2331,17 @@ function exportExcel() {
         const formattedSum = fmt(sumVal);
         const fmt1 = !isNaN(num1) ? fmt(num1) : "";
         const fmt2 = !isNaN(num2) && num2 > 0 ? fmt(num2) : "";
+        const fmtTip = !isNaN(numTip) && numTip > 0 ? "Trinkgeld " + fmt(numTip) : "";
 
-        if (a2Str && fmt2) {
-          dayLines.push(["", formattedSum, `${fmt1} + ${fmt2}`]);
+        let parts = [];
+        if (fmt1) parts.push(fmt1);
+        if (fmt2) parts.push(fmt2);
+        if (fmtTip) parts.push(fmtTip);
+
+        if (parts.length > 1) {
+          dayLines.push(["", formattedSum, parts.join(" + ")]);
         } else {
-          dayLines.push(["", fmt1, ""]);
+          dayLines.push(["", formattedSum, ""]);
         }
 
         tagSum += sumVal;
@@ -2012,8 +2349,13 @@ function exportExcel() {
     });
 
     if (tagSum > 0) {
-      ws_data.push([dateStr]); // Datum als Überschrift
-      dayLines.forEach(l => ws_data.push(l));
+      dayLines.forEach((l, index) => {
+        if (index === 0) {
+          ws_data.push([dateStr, l[1], l[2]]);
+        } else {
+          ws_data.push(["", l[1], l[2]]);
+        }
+      });
       ws_data.push(["", "----------"]);
       ws_data.push(["", tagSum.toFixed(2).replace(".", ","), `|   ${kunden} Kunden`]);
       ws_data.push([]); // Leere Zeile
@@ -2022,11 +2364,9 @@ function exportExcel() {
     }
   }
 
-  // Monatsübersicht mit Trinkgeld, Netto, MwSt
-  const tip = parseFloat(document.getElementById("total-tip")?.value.replace(",", ".") || "0");
-  const withTip = total + tip;
-  const netto = withTip / 1.19;
-  const mwst = withTip - netto;
+  // Monatsübersicht mit Netto und MwSt (inkl. Trinkgeld)
+  const netto = total / 1.19;
+  const mwst = total - netto;
 
   const fmt = n => n.toFixed(2).replace(".", ",");
 
@@ -2034,8 +2374,6 @@ function exportExcel() {
   ws_data.push(["Monatsübersicht"]);
   ws_data.push(["----------------"]);
   ws_data.push(["Gesamtsumme:", fmt(total)]);
-  ws_data.push(["Trinkgeld:", fmt(tip)]);
-  ws_data.push(["Summe inkl. Trinkgeld:", fmt(withTip)]);
   ws_data.push(["Netto:", fmt(netto)]);
   ws_data.push(["MwSt (19%):", fmt(mwst)]);
   ws_data.push(["Gesamtanzahl Kunden:", totalCustomers]);
@@ -2095,7 +2433,188 @@ updateMonth = function () {
   applyLockStatus();
 };
 
-// Schnelleingabe für einen Standardbetrag (z.B. 33 €) in das aktuell ausgewählte Betrag-1-Fel</script>
+// Sperrstatus beim JSON-Export berücksichtigen
+const _origExportJSON = exportJSON;
+exportJSON = function () {
+  const data = {
+    year: selYear,
+    month: selMonth,
+    days: {},
+    free: {},
+    locked: isMonthLocked(selYear, selMonth) ? true : false
+  };
+
+  for(let d = 1; d <= selDays; d++){
+    const key = "day-" + selYear + "-" + selMonth + "-" + d;
+    const raw = localStorage.getItem(key);
+    if(raw) data.days[key] = JSON.parse(raw);
+
+    const cf = "cf-" + selYear + "-" + selMonth + "-" + d;
+    const freeVal = localStorage.getItem(cf);
+    if(freeVal) data.free[cf] = freeVal;
+  }
+
+  const defaultName = "einnahmen_" + selYear + "-" + String(selMonth+1).padStart(2,"0") + ".json";
+  let filename = prompt("Dateiname:", defaultName);
+  if (!filename) return;
+  if (!filename.toLowerCase().endsWith(".json")) {
+    filename += ".json";
+  }
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+// Sperrstatus beim Import wiederherstellen
+const _origImportJSON = importJSON;
+importJSON = function (ev) {
+  const file = ev.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if(data.days){
+        for(const key in data.days){
+          localStorage.setItem(key, JSON.stringify(data.days[key]));
+        }
+      }
+      if(data.free){
+        for(const key in data.free){
+          const val = data.free[key];
+          if(val === 1 || val === "1" || val === true){
+            localStorage.setItem(key, "urlaub");
+          } else if(val === "urlaub" || val === "krank") {
+            localStorage.setItem(key, val);
+          } else {
+            localStorage.setItem(key, "urlaub");
+          }
+        }
+      }
+      if(data.locked === true){
+        localStorage.setItem(`locked-${data.year}-${data.month}`, "1");
+      }
+      alert("Import erfolgreich. Seite wird neu geladen.");
+      location.reload();
+    } catch(err) {
+      alert("Fehler beim Import: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+};
+
+// Schnelleingabe für einen Standardbetrag (z.B. 33 €) in das aktuell ausgewählte Betrag-1-Fel
+function generateYearOverview() {
+  const year = selYear;
+  let output = "";
+  let grandTotal = 0;
+  let grandCustomers = 0;
+
+  output += "Einnahmen Jahresübersicht " + year + "\n\n";
+
+  for (let m = 0; m < 12; m++) {
+    const days = daysInMonth(year, m);
+    let monthTotal = 0;
+    let monthCustomers = 0;
+
+    for (let d = 1; d <= days; d++) {
+      const key = "day-" + year + "-" + m + "-" + d;
+      let rows = [];
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        try { rows = JSON.parse(raw); } catch (e) { rows = []; }
+      }
+
+      if (rows && rows.length) {
+        rows.forEach(r => {
+          const a1Str = r.amount1 !== undefined ? r.amount1 : (r.a1 || "");
+          const a2Str = r.amount2 !== undefined ? r.amount2 : (r.a2 || "");
+          const tipStr = r.amountTip !== undefined ? r.amountTip : "";
+          const num1 = parseFloat(String(a1Str).replace(",", "."));
+          const num2 = parseFloat(String(a2Str).replace(",", "."));
+          const numTip = parseFloat(String(tipStr).replace(",", "."));
+          const sumVal =
+            (isNaN(num1) ? 0 : num1) +
+            (isNaN(num2) ? 0 : num2) +
+            (isNaN(numTip) ? 0 : numTip);
+          if (sumVal > 0) {
+            monthTotal += sumVal;
+            monthCustomers++;
+          }
+        });
+      }
+    }
+
+    if (monthTotal > 0) {
+      const fmt = n => n.toFixed(2).replace(".", ",");
+      const netto = monthTotal / 1.19;
+      const mwst = monthTotal - netto;
+      const label = (monthNames[m] + " " + year).padEnd(18);
+      output += label
+        + "Brutto: " + fmt(monthTotal).padStart(10)
+        + "   Netto: " + fmt(netto).padStart(10)
+        + "   MwSt: " + fmt(mwst).padStart(10)
+        + "   Kunden: " + String(monthCustomers).padStart(4)
+        + "\n";
+      grandTotal += monthTotal;
+      grandCustomers += monthCustomers;
+    }
+  }
+
+  if (grandTotal > 0) {
+    const fmt = n => n.toFixed(2).replace(".", ",");
+    const netto = grandTotal / 1.19;
+    const mwst = grandTotal - netto;
+    output += "\n";
+    output += "Jahresgesamt " + year + "\n";
+    output += "-------------------------\n";
+    output += "Brutto: ".padEnd(12) + fmt(grandTotal).padStart(10) + "\n";
+    output += "Netto: ".padEnd(12) + fmt(netto).padStart(10) + "\n";
+    output += "MwSt: ".padEnd(12) + fmt(mwst).padStart(10) + "\n";
+    output += "Kunden: ".padEnd(12) + String(grandCustomers).padStart(10) + "\n";
+  } else {
+    output += "Für das Jahr " + year + " liegen keine Einträge vor.\n";
+  }
+
+  const rp = document.getElementById("reduced-print");
+  if (rp) {
+    rp.innerText = output;
+    rp.style.display = "block";
+    setTimeout(() => {
+      window.print();
+      rp.style.display = "none";
+    }, 100);
+  }
+}
+
+</script>
+
+
+<script>
+(function(){
+  function updateAdvancedControlsVisibility(){
+    const input = document.getElementById('unlock-code');
+    const adv = document.getElementById('advanced-controls');
+    if(!input || !adv) return;
+    const code = (input.value || '').trim();
+    adv.style.display = (code === '1202') ? 'block' : 'none';
+  }
+
+  document.addEventListener('input', function(e){
+    if(e && e.target && e.target.id === 'unlock-code'){
+      updateAdvancedControlsVisibility();
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', updateAdvancedControlsVisibility);
+})();
+</script>
 
 </body>
 </html>
