@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V217</title>
+<title>Einnahmen V218</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -1495,7 +1495,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V217</h1>
+<h1>Einnahmen V218</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span><span id="month-lock-toggle" onclick="toggleLock()" style="cursor:pointer; font-size: 1.4em; margin-left: 10px;" title="Monat bearbeiten/sperren">🔓</span>
@@ -1627,9 +1627,19 @@ function generateQuarterReducedPrint() {
   let totalCustomers = 0;
   let printedTotal = 0;
 
+  const labelWidth = 24;
+  function line(label, value) {
+    return label.padEnd(labelWidth) + value.toFixed(2).replace(".", ",").padStart(10) + "\n\n";
+  }
+
   months.forEach(m => {
     output += "Einnahmen " + monthNames[m] + " " + year + "\n\n";
     const days = daysInMonth(year, m);
+
+    let monthTotal = 0;
+    let monthCustomers = 0;
+    let monthPrintedTotal = 0;
+
     for (let d = 1; d <= days; d++) {
       const key = "day-" + year + "-" + m + "-" + d;
       let rows = [];
@@ -1708,12 +1718,32 @@ function generateQuarterReducedPrint() {
         }
         output += " ".repeat(12) + "----------\n";
         output += " ".repeat(12) + tagSum.toFixed(2).replace(".", ",").padStart(10) + "   |   " + kunden + " Kunden\n\n";
+
         const roundedDay = Math.round(tagSum * 100) / 100;
         printedTotal += roundedDay;
         total += tagSum;
         totalCustomers += kunden;
+
+        monthPrintedTotal += roundedDay;
+        monthTotal += tagSum;
+        monthCustomers += kunden;
       }
     }
+
+    // Monatsübersicht (nach jedem Monat)
+    const nettoM = monthTotal / 1.19;
+    const mwstM = monthTotal - nettoM;
+    const roundedMonth = Math.round(monthPrintedTotal * 100) / 100;
+    const roundingDiffM = Math.round((roundedMonth - monthTotal) * 100) / 100;
+
+    output += "Monatsübersicht (" + monthNames[m] + " " + year + ")\n";
+    output += line("Summe Tagessummen:", roundedMonth);
+    output += line("Exakte Gesamtsumme:", monthTotal);
+    output += line("Rundungsdifferenz:", roundingDiffM);
+    output += line("Netto:", nettoM);
+    output += line("MwSt (19%):", mwstM);
+    output += ("Gesamtanzahl Kunden:".padEnd(labelWidth) + String(monthCustomers).padStart(10) + "\n\n");
+
     output += "\n";
   });
 
@@ -1721,10 +1751,7 @@ function generateQuarterReducedPrint() {
   const mwst = total - netto;
   const roundedTotal = Math.round(printedTotal * 100) / 100;
   const roundingDiff = Math.round((roundedTotal - total) * 100) / 100;
-  const labelWidth = 24;
-  function line(label, value) {
-    return label.padEnd(labelWidth) + value.toFixed(2).replace(".", ",").padStart(10) + "\n\n";
-  }
+
   output += "Quartalsübersicht (Q" + q + " " + year + ")\n";
   output += line("Summe Tagessummen:", roundedTotal);
   output += line("Exakte Gesamtsumme:", total);
