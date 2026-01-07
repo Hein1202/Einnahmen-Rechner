@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V218</title>
+<title>Einnahmen V220</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -1227,16 +1227,23 @@ function loadAllDays(){
 function updateTotals(){
   let total = 0;
   let totalCustomers = 0;
-  let printedTotal = 0;
+  let totalWorkdays = 0;
+
   for(let d = 1; d <= selDays; d++){
     const s = parseFloat(document.getElementById("sum-" + d)?.innerText) || 0;
     const c = parseInt(document.getElementById("cnt-" + d)?.innerText) || 0;
     total += s;
     totalCustomers += c;
+    if (c > 0) totalWorkdays++;
   }
+
   document.getElementById("grand-total").innerText = total.toFixed(2);
+
   const grandCustomersEl = document.getElementById("grand-customers");
   if (grandCustomersEl) grandCustomersEl.innerText = totalCustomers;
+
+  const grandWorkdaysEl = document.getElementById("grand-workdays");
+  if (grandWorkdaysEl) grandWorkdaysEl.innerText = totalWorkdays;
 
   const net = total / 1.19;
   document.getElementById("net-total").innerText = net.toFixed(2);
@@ -1495,7 +1502,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V218</h1>
+<h1>Einnahmen V220</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span><span id="month-lock-toggle" onclick="toggleLock()" style="cursor:pointer; font-size: 1.4em; margin-left: 10px;" title="Monat bearbeiten/sperren">🔓</span>
@@ -1523,6 +1530,17 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
     Gesamtanzahl Kunden:
   </td>
 <td id="grand-customers" style="font-weight: bold;">0</td>
+</tr>
+<tr>
+<!-- Beschriftung links und Gesamtzahl der Arbeitstage in der letzten Spalte -->
+<td colspan="4" style="text-align: right;
+             font-weight: normal;
+             color: #000;
+             font-size: 0.8em;
+             font-style: italic;">
+    Gesamtanzahl&nbsp;Arbeitstage:
+  </td>
+<td id="grand-workdays" style="font-weight: bold;">0</td>
 </tr>
 </table>
 
@@ -1625,6 +1643,7 @@ function generateQuarterReducedPrint() {
   let output = "";
   let total = 0;
   let totalCustomers = 0;
+  let totalWorkdays = 0;
   let printedTotal = 0;
 
   const labelWidth = 24;
@@ -1638,6 +1657,7 @@ function generateQuarterReducedPrint() {
 
     let monthTotal = 0;
     let monthCustomers = 0;
+    let monthWorkdays = 0;
     let monthPrintedTotal = 0;
 
     for (let d = 1; d <= days; d++) {
@@ -1723,10 +1743,12 @@ function generateQuarterReducedPrint() {
         printedTotal += roundedDay;
         total += tagSum;
         totalCustomers += kunden;
+        totalWorkdays += 1;
 
         monthPrintedTotal += roundedDay;
         monthTotal += tagSum;
         monthCustomers += kunden;
+        monthWorkdays += 1;
       }
     }
 
@@ -1744,7 +1766,8 @@ function generateQuarterReducedPrint() {
     output += line("MwSt (19%):", mwstM);
     output += ("Gesamtanzahl Kunden:".padEnd(labelWidth) + String(monthCustomers).padStart(10) + "\n\n");
 
-    output += "\n";
+        output += ("Gesamtanzahl Arbeitstage:".padEnd(labelWidth) + String(monthWorkdays).padStart(10) + "\n\n");
+output += "\n";
   });
 
   const netto = total / 1.19;
@@ -1760,7 +1783,8 @@ function generateQuarterReducedPrint() {
   output += line("MwSt (19%):", mwst);
   output += ("Gesamtanzahl Kunden:".padEnd(labelWidth) + String(totalCustomers).padStart(10) + "\n");
 
-  const rp = document.getElementById("reduced-print");
+    output += ("Gesamtanzahl Arbeitstage:".padEnd(labelWidth) + String(totalWorkdays).padStart(10) + "\n");
+const rp = document.getElementById("reduced-print");
   if (rp) {
     rp.innerText = output;
     rp.style.display = "block";
@@ -1779,12 +1803,13 @@ function exportQuarterExcel() {
   const ws_data = [];
   let grandTotal = 0;
   let grandCustomers = 0;
+  let grandWorkdays = 0;
 
   months.forEach(m => {
     const days = daysInMonth(year, m);
     let monthTotal = 0;
     let monthCustomers = 0;
-
+    let monthWorkdays = 0;
     ws_data.push([]);
     ws_data.push([monthNames[m] + " " + year]);
 
@@ -1873,6 +1898,7 @@ dayLines.forEach((l, index) => {
         ws_data.push([]);
         monthTotal += tagSum;
         monthCustomers += kunden;
+        monthWorkdays += 1;
       }
     }
 
@@ -1886,11 +1912,13 @@ dayLines.forEach((l, index) => {
       ws_data.push(["Netto", fmt(netto)]);
       ws_data.push(["MwSt", fmt(mwst)]);
       ws_data.push(["Gesamtanzahl Kunden", String(monthCustomers)]);
-      ws_data.push([]);
+            ws_data.push(["Gesamtanzahl Arbeitstage", String(monthWorkdays)]);
+ws_data.push([]);
     }
 
     grandTotal += monthTotal;
     grandCustomers += monthCustomers;
+    grandWorkdays += monthWorkdays;
   });
 
   if (grandTotal > 0) {
@@ -1903,7 +1931,8 @@ dayLines.forEach((l, index) => {
     ws_data.push(["Netto", fmt(netto)]);
     ws_data.push(["MwSt", fmt(mwst)]);
     ws_data.push(["Gesamtanzahl Kunden", String(grandCustomers)]);
-  }
+      ws_data.push(["Gesamtanzahl Arbeitstage", String(grandWorkdays)]);
+}
 
   const ws = XLSX.utils.aoa_to_sheet(ws_data);
   XLSX.utils.book_append_sheet(wb, ws, "Quartal");
@@ -1917,6 +1946,7 @@ function generateReducedPrint() {
 
   let total = 0;
   let totalCustomers = 0;
+  let totalWorkdays = 0;
   let printedTotal = 0;
 
   for (let d = 1; d <= selDays; d++) {
@@ -2004,7 +2034,8 @@ function generateReducedPrint() {
       printedTotal += roundedDay;
       total += tagSum;
       totalCustomers += kunden;
-    }
+      totalWorkdays += 1;
+      }
   }
 
   // Netto und MwSt aus der Gesamtsumme (inkl. Trinkgeld) berechnen
@@ -2030,6 +2061,7 @@ const labelWidth = 24;
   output += line("MwSt (19%):", mwst);
   // Gesamtanzahl der Kunden anhängen
   output += "Gesamtanzahl Kunden:".padEnd(labelWidth) + String(totalCustomers).padStart(10) + "\n\n";
+  output += "Gesamtanzahl Arbeitstage:".padEnd(labelWidth) + String(totalWorkdays).padStart(10) + "\n\n";
 
   // Text in das versteckte Druckdiv schreiben und anzeigen
   const rp = document.getElementById("reduced-print");
@@ -2045,6 +2077,8 @@ const labelWidth = 24;
 <script>
 function updateCustomerTotal() {
   let totalCustomers = 0;
+  const workdays = new Set();
+
   const rows = document.querySelectorAll("tbody[id^='day-'] tr.entry-row");
   rows.forEach(row => {
     const amount1 = row.querySelector(".amount1")?.value || "";
@@ -2054,10 +2088,19 @@ function updateCustomerTotal() {
     if (amount1) sum += parseFloat(amount1.replace(",", "."));
     if (amount2) sum += parseFloat(amount2.replace(",", "."));
     if (tipVal) sum += parseFloat(tipVal.replace(",", "."));
-    if (sum > 0) totalCustomers++;
+
+    if (sum > 0) {
+      totalCustomers++;
+      const day = getDayFromEntryRow(row);
+      if (day != null) workdays.add(day);
+    }
   });
+
   const target = document.getElementById("grand-customers");
   if (target) target.textContent = totalCustomers;
+
+  const wdTarget = document.getElementById("grand-workdays");
+  if (wdTarget) wdTarget.textContent = String(workdays.size);
 }
 
 document.addEventListener("DOMContentLoaded", updateCustomerTotal);
@@ -2297,6 +2340,7 @@ function exportExcel() {
 
   let total = 0;
   let totalCustomers = 0;
+  let totalWorkdays = 0;
 
   for (let d = 1; d <= selDays; d++) {
     const dateStr = String(d).padStart(2, "0") + "." + String(selMonth + 1).padStart(2, "0") + "." + selYear;
@@ -2388,6 +2432,7 @@ function exportExcel() {
       ws_data.push([]); // Leere Zeile
       total += tagSum;
       totalCustomers += kunden;
+      totalWorkdays += 1;
     }
   }
 
@@ -2405,7 +2450,8 @@ function exportExcel() {
   ws_data.push(["MwSt (19%):", fmt(mwst)]);
   ws_data.push(["Gesamtanzahl Kunden:", totalCustomers]);
 
-  const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    ws_data.push(["Gesamtanzahl Arbeitstage:", totalWorkdays]);
+const ws = XLSX.utils.aoa_to_sheet(ws_data);
   XLSX.utils.book_append_sheet(wb, ws, "Einnahmen");
 
   const filename = `Einnahmen_${selYear}-${String(selMonth+1).padStart(2,"0")}.xlsx`;
@@ -2542,14 +2588,14 @@ function generateYearOverview() {
   let output = "";
   let grandTotal = 0;
   let grandCustomers = 0;
-
+  let grandWorkdays = 0;
   output += "Einnahmen Jahresübersicht " + year + "\n\n";
 
   for (let m = 0; m < 12; m++) {
     const days = daysInMonth(year, m);
     let monthTotal = 0;
     let monthCustomers = 0;
-
+    let monthWorkdays = 0;
     for (let d = 1; d <= days; d++) {
       const key = "day-" + year + "-" + m + "-" + d;
       let rows = [];
@@ -2558,6 +2604,35 @@ function generateYearOverview() {
         try { rows = JSON.parse(raw); } catch (e) { rows = []; }
       }
 
+      let daySum = 0;
+      let dayCustomers = 0;
+
+      if (rows && rows.length) {
+        rows.forEach(r => {
+          const a1Str = r.amount1 !== undefined ? r.amount1 : (r.a1 || "");
+          const a2Str = r.amount2 !== undefined ? r.amount2 : (r.a2 || "");
+          const tipStr = r.amountTip !== undefined ? r.amountTip : "";
+          const num1 = parseFloat(String(a1Str).replace(",", "."));
+          const num2 = parseFloat(String(a2Str).replace(",", "."));
+          const numTip = parseFloat(String(tipStr).replace(",", "."));
+          const sumVal =
+            (isNaN(num1) ? 0 : num1) +
+            (isNaN(num2) ? 0 : num2) +
+            (isNaN(numTip) ? 0 : numTip);
+
+          if (sumVal > 0) {
+            daySum += sumVal;
+            dayCustomers++;
+          }
+        });
+      }
+
+      if (dayCustomers > 0) {
+        monthTotal += daySum;
+        monthCustomers += dayCustomers;
+        monthWorkdays += 1;
+      }
+    }
       if (rows && rows.length) {
         rows.forEach(r => {
           const a1Str = r.amount1 !== undefined ? r.amount1 : (r.a1 || "");
@@ -2591,6 +2666,7 @@ function generateYearOverview() {
         + "\n";
       grandTotal += monthTotal;
       grandCustomers += monthCustomers;
+      grandWorkdays += monthWorkdays;
     }
   }
 
@@ -2605,7 +2681,8 @@ function generateYearOverview() {
     output += "Netto: ".padEnd(12) + fmt(netto).padStart(10) + "\n";
     output += "MwSt: ".padEnd(12) + fmt(mwst).padStart(10) + "\n";
     output += "Kunden: ".padEnd(12) + String(grandCustomers).padStart(10) + "\n";
-  } else {
+      output += "Arbeitstage: ".padEnd(12) + String(grandWorkdays).padStart(10) + "\n";
+} else {
     output += "Für das Jahr " + year + " liegen keine Einträge vor.\n";
   }
 
