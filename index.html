@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V223</title>
+<title>Einnahmen V225</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -1512,7 +1512,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V223</h1>
+<h1>Einnahmen V225</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span><span id="month-lock-toggle" onclick="toggleLock()" style="cursor:pointer; font-size: 1.4em; margin-left: 10px;" title="Monat bearbeiten/sperren">🔓</span>
@@ -1769,14 +1769,29 @@ function generateQuarterReducedPrint() {
 
       if (tagSum > 0) {
         const dateStr = String(d).padStart(2, "0") + "." + String(m + 1).padStart(2, "0") + "." + year;
-        const maxLines = Math.max(zeilen.length, 1);
-        for (let i = 0; i < maxLines; i++) {
-          const datum = i === 0 ? dateStr.padEnd(12) : " ".repeat(12);
-          const einnahme = zeilen[i] || "";
-          output += datum + einnahme + "\n";
-        }
-        output += " ".repeat(12) + "----------\n";
-        output += " ".repeat(12) + tagSum.toFixed(2).replace(".", ",").padStart(10) + "   |   " + kunden + " Kunden\n\n";
+const kundenLabel = (kunden === 1 ? "Kunde" : "Kunden");
+
+// Wenn genau 1 Kunde und genau 1 einfacher Betrag: keine doppelte Summenzeile ausgeben.
+const isSimpleSingle =
+  kunden === 1 &&
+  zeilen.length === 1 &&
+  !String(zeilen[0]).includes(" + ") &&
+  !String(zeilen[0]).includes("Trinkgeld");
+
+if (isSimpleSingle) {
+  output += dateStr.padEnd(12) + zeilen[0] + "   |   1 " + kundenLabel + "\n\n";
+} else {
+  const maxLines = Math.max(zeilen.length, 1);
+  for (let i = 0; i < maxLines; i++) {
+    const datum = i === 0 ? dateStr.padEnd(12) : " ".repeat(12);
+    const einnahme = zeilen[i] || "";
+    output += datum + einnahme + "\n";
+  }
+  output += " ".repeat(12) + "----------\n";
+  output += " ".repeat(12)
+    + tagSum.toFixed(2).replace(".", ",").padStart(10)
+    + "   |   " + kunden + " " + kundenLabel + "\n\n";
+}
 
         const roundedDay = Math.round(tagSum * 100) / 100;
         printedTotal += roundedDay;
@@ -1923,22 +1938,30 @@ function exportQuarterExcel() {
       }
 
       if (tagSum > 0) {
-        
-dayLines.forEach((l, index) => {
-  if (index === 0) {
-    ws_data.push([dateStr, l[1], l[2]]);
-  } else {
-    ws_data.push(["", l[1], l[2]]);
-  }
-});
+  const kundenLabel = (kunden === 1 ? "Kunde" : "Kunden");
+  const isSimpleSingle = (kunden === 1 && dayLines.length === 1 && !String(dayLines[0][2] || "").trim());
 
-        ws_data.push(["", "----------"]);
-        ws_data.push(["", tagSum.toFixed(2).replace(".", ","), `|   ${kunden} Kunden`]);
-        ws_data.push([]);
-        monthTotal += tagSum;
-        monthCustomers += kunden;
-        monthWorkdays += 1;
+  if (isSimpleSingle) {
+    ws_data.push([dateStr, dayLines[0][1], `|   ${kunden} ${kundenLabel}`]);
+    ws_data.push([]);
+  } else {
+    dayLines.forEach((l, index) => {
+      if (index === 0) {
+        ws_data.push([dateStr, l[1], l[2]]);
+      } else {
+        ws_data.push(["", l[1], l[2]]);
       }
+    });
+
+    ws_data.push(["", "----------"]);
+    ws_data.push(["", tagSum.toFixed(2).replace(".", ","), `|   ${kunden} ${kundenLabel}`]);
+    ws_data.push([]);
+  }
+
+  monthTotal += tagSum;
+  monthCustomers += kunden;
+  monthWorkdays += 1;
+}
     }
 
     if (monthTotal > 0) {
@@ -2059,15 +2082,29 @@ function generateReducedPrint() {
     if (tagSum > 0) {
       // Datum im Format TT.MM.JJJJ
       const date = String(d).padStart(2, "0") + "." + String(selMonth + 1).padStart(2, "0") + "." + selYear;
-      const maxLines = Math.max(zeilen.length, 1);
-      for (let i = 0; i < maxLines; i++) {
-        const datum = i === 0 ? date.padEnd(12) : " ".repeat(12);
-        // Zeile enthält bereits gepaddeten Gesamtbetrag und ggf. separate Beträge rechts davon.
-        const einnahme = zeilen[i] || "";
-        output += datum + einnahme + "\n";
-      }
-      output += " ".repeat(12) + "----------\n";
-      output += " ".repeat(12) + tagSum.toFixed(2).replace(".", ",").padStart(10) + "   |   " + kunden + " Kunden\n\n";
+const kundenLabel = (kunden === 1 ? "Kunde" : "Kunden");
+
+// Wenn genau 1 Kunde und genau 1 einfacher Betrag: keine doppelte Summenzeile ausgeben.
+const isSimpleSingle =
+  kunden === 1 &&
+  zeilen.length === 1 &&
+  !String(zeilen[0]).includes(" + ") &&
+  !String(zeilen[0]).includes("Trinkgeld");
+
+if (isSimpleSingle) {
+  output += date.padEnd(12) + zeilen[0] + "   |   1 " + kundenLabel + "\n\n";
+} else {
+  const maxLines = Math.max(zeilen.length, 1);
+  for (let i = 0; i < maxLines; i++) {
+    const datum = i === 0 ? date.padEnd(12) : " ".repeat(12);
+    const einnahme = zeilen[i] || "";
+    output += datum + einnahme + "\n";
+  }
+  output += " ".repeat(12) + "----------\n";
+  output += " ".repeat(12)
+    + tagSum.toFixed(2).replace(".", ",").padStart(10)
+    + "   |   " + kunden + " " + kundenLabel + "\n\n";
+}
 
       const roundedDay = Math.round(tagSum * 100) / 100;
       printedTotal += roundedDay;
@@ -2459,20 +2496,30 @@ function exportExcel() {
     });
 
     if (tagSum > 0) {
-      dayLines.forEach((l, index) => {
-        if (index === 0) {
-          ws_data.push([dateStr, l[1], l[2]]);
-        } else {
-          ws_data.push(["", l[1], l[2]]);
-        }
-      });
-      ws_data.push(["", "----------"]);
-      ws_data.push(["", tagSum.toFixed(2).replace(".", ","), `|   ${kunden} Kunden`]);
-      ws_data.push([]); // Leere Zeile
-      total += tagSum;
-      totalCustomers += kunden;
-      totalWorkdays += 1;
-    }
+  const kundenLabel = (kunden === 1 ? "Kunde" : "Kunden");
+  const isSimpleSingle = (kunden === 1 && dayLines.length === 1 && !String(dayLines[0][2] || "").trim());
+
+  if (isSimpleSingle) {
+    ws_data.push([dateStr, dayLines[0][1], `|   ${kunden} ${kundenLabel}`]);
+    ws_data.push([]); // Leere Zeile
+  } else {
+    dayLines.forEach((l, index) => {
+      if (index === 0) {
+        ws_data.push([dateStr, l[1], l[2]]);
+      } else {
+        ws_data.push(["", l[1], l[2]]);
+      }
+    });
+
+    ws_data.push(["", "----------"]);
+    ws_data.push(["", tagSum.toFixed(2).replace(".", ","), `|   ${kunden} ${kundenLabel}`]);
+    ws_data.push([]); // Leere Zeile
+  }
+
+  total += tagSum;
+  totalCustomers += kunden;
+  totalWorkdays += 1;
+}
   }
 
   // Monatsübersicht mit Netto und MwSt (inkl. Trinkgeld)
