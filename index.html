@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V230</title>
+<title>Einnahmen V231</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -1391,29 +1391,38 @@ function exportCSV(){
   body * {
     display: none !important;
   }
-  /* Den Ausdrucksbereich und seine Kinder sichtbar machen */
+
+  /* Ausdrucksbereich sichtbar machen */
   #reduced-print {
     display: block !important;
-  }
-  /* Kinder wieder im Standard-Layout anzeigen (statt alles als Block) */
-  #reduced-print * {
-    display: initial !important;
-  }
-  #reduced-print pre {
-    margin: 0;
-  }
-  #reduced-print .print-heading {
-    font-weight: 800 !important;
-  }
-  #reduced-print {
     position: absolute;
     left: 0;
     top: 0;
-    font-family: monospace;
-    white-space: pre;
     font-size: 12pt;
     color: black !important;
     background: white !important;
+    white-space: pre !important;
+  }
+
+  /* Monospace im Ausdruck erzwingen (wichtig für bündige Spalten) */
+  #reduced-print, #reduced-print * {
+    font-family: "Courier New", Courier, monospace !important;
+  }
+
+  /* Pre-Layout beibehalten */
+  #reduced-print pre {
+    display: block !important;
+    margin: 0 !important;
+    white-space: pre !important;
+  }
+
+  /* Überschriften-Spans inline halten */
+  #reduced-print pre span {
+    display: inline !important;
+  }
+
+  #reduced-print .print-heading {
+    font-weight: 800 !important;
   }
 }
 
@@ -1469,7 +1478,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V230</h1>
+<h1>Einnahmen V231</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span><span id="month-lock-toggle" onclick="toggleLock()" style="cursor:pointer; font-size: 1.4em; margin-left: 10px;" title="Monat bearbeiten/sperren">🔓</span>
@@ -1642,7 +1651,7 @@ function generateQuarterReducedPrint() {
   let totalWorkdays = 0;
   let printedTotal = 0;
 
-  const labelWidth = 24;
+  const labelWidth = 26;
   function line(label, value) {
     return label.padEnd(labelWidth) + value.toFixed(2).replace(".", ",").padStart(10) + "\n\n";
   }
@@ -2086,7 +2095,7 @@ if (kunden === 1) {
     const roundedTotal = Math.round(printedTotal * 100) / 100;
   const roundingDiff = Math.round((roundedTotal - total) * 100) / 100;
 
-const labelWidth = 24;
+const labelWidth = 26;
   // Helferfunktion für eine Zeile der Monatsübersicht
   function line(label, value) {
     return label.padEnd(labelWidth) + value.toFixed(2).replace(".", ",").padStart(10) + "\n\n";
