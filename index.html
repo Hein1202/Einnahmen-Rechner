@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V231</title>
+<title>Einnahmen V232</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -936,6 +936,7 @@ function updateMonth(){
   buildTable();
   loadAllDays();
   updateTotals();
+  populateYearArchiveSelect();
 }
 
 // Tabelle aufbauen
@@ -1375,6 +1376,216 @@ function exportCSV(){
   URL.revokeObjectURL(url);
 }
 
+
+
+// ======================
+// Jahresarchiv (Backup)
+// ======================
+
+// Ermittelt alle Jahre, die aktuell im localStorage vorkommen (day-/cf-/locked-Keys)
+function getArchiveYearsFromStorage(){
+  const years = new Set();
+  try{
+    for(let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if(!k) continue;
+      const m = k.match(/^(day|cf|locked)-(\d{4})-/);
+      if(m) years.add(parseInt(m[2], 10));
+    }
+  } catch(e){}
+  if(typeof selYear === "number") years.add(selYear);
+  return Array.from(years).filter(y => !isNaN(y)).sort((a,b) => b-a);
+}
+
+function populateYearArchiveSelect(){
+  const sel = document.getElementById("year-archive-select");
+  if(!sel) return;
+  const years = getArchiveYearsFromStorage();
+  sel.innerHTML = "";
+  years.forEach(y => {
+    const opt = document.createElement("option");
+    opt.value = String(y);
+    opt.textContent = String(y);
+    if (typeof selYear === "number" && y === selYear) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  // Falls noch kein Jahr vorhanden ist, wenigstens aktuelles Jahr anbieten
+  if(!sel.options.length && typeof selYear === "number"){
+    const opt = document.createElement("option");
+    opt.value = String(selYear);
+    opt.textContent = String(selYear);
+    sel.appendChild(opt);
+  }
+}
+
+function _getSelectedArchiveYear(){
+  const sel = document.getElementById("year-archive-select");
+  const y = sel ? parseInt(sel.value, 10) : NaN;
+  return (!isNaN(y) ? y : selYear);
+}
+
+function _buildYearArchiveData(year){
+  const data = {
+    app: "Einnahmen",
+    version: "V232",
+    year: year,
+    createdAt: new Date().toISOString(),
+    days: {},
+    free: {},
+    locked: {}
+  };
+
+  for(let i = 0; i < localStorage.length; i++){
+    const k = localStorage.key(i);
+    if(!k) continue;
+
+    if(k.startsWith(`day-${year}-`)){
+      const raw = localStorage.getItem(k);
+      if(raw){
+        try { data.days[k] = JSON.parse(raw); }
+        catch(e){ data.days[k] = raw; }
+      }
+    } else if(k.startsWith(`cf-${year}-`)){
+      const v = localStorage.getItem(k);
+      if(v != null) data.free[k] = v;
+    } else if(k.startsWith(`locked-${year}-`)){
+      // lock key: locked-YYYY-M
+      const v = localStorage.getItem(k);
+      if(v != null) data.locked[k] = v;
+    }
+  }
+  return data;
+}
+
+function _downloadJsonData(data, defaultName, promptMessage){
+  let filename = prompt(promptMessage || "Dateiname:", defaultName);
+  if (filename === null) return false; // Abbrechen
+  filename = (filename || "").trim();
+  if (!filename) filename = defaultName;
+  if (!filename.toLowerCase().endsWith(".json")) filename += ".json";
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+  return true;
+}
+
+// Manuelles Jahres-Backup (nur speichern)
+function exportYearArchive(){
+  const year = _getSelectedArchiveYear();
+  const data = _buildYearArchiveData(year);
+  const defaultName = `einnahmen_${year}_gesamt.json`;
+  const msg =
+    "Jahres-Backup für " + year + "\n\n" +
+    "Die Datei wird in Ihrem Standard-Download-Ordner gespeichert.\n\n" +
+    "Vorgeschlagener Dateiname:\n" + defaultName + "\n\n" +
+    "Sie können den Dateinamen hier ändern oder einfach mit OK bestätigen.";
+  _downloadJsonData(data, defaultName, msg);
+}
+
+// Jahres-Backup laden (Restore)
+function importYearArchive(ev){
+  const file = ev?.target?.files?.[0];
+  if(!file) return;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const data = JSON.parse(e.target.result);
+
+      // Unterstützt Struktur: {year, days, free, locked}
+      // und optional: {years: { "2025": {days, free, locked} } }
+      let payload = data;
+      if (data && data.years && typeof data.years === "object") {
+        const yearKey = String(_getSelectedArchiveYear());
+        payload = data.years[yearKey] || data.years[Object.keys(data.years)[0]];
+      }
+
+      if(payload && payload.days){
+        for(const key in payload.days){
+          localStorage.setItem(key, JSON.stringify(payload.days[key]));
+        }
+      }
+      if(payload && payload.free){
+        for(const key in payload.free){
+          const val = payload.free[key];
+          if(val === 1 || val === "1" || val === true){
+            localStorage.setItem(key, "urlaub");
+          } else if(val === "urlaub" || val === "krank") {
+            localStorage.setItem(key, val);
+          } else if(val != null) {
+            localStorage.setItem(key, String(val));
+          }
+        }
+      }
+      if(payload && payload.locked){
+        for(const key in payload.locked){
+          const v = payload.locked[key];
+          if(v === "1" || v === 1 || v === true){
+            localStorage.setItem(key, "1");
+          } else {
+            localStorage.removeItem(key);
+          }
+        }
+      }
+
+      alert("Jahres-Import erfolgreich. Seite wird neu geladen.");
+      location.reload();
+    } catch(err){
+      alert("Fehler beim Jahres-Import: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+
+  // Input zurücksetzen, damit die gleiche Datei erneut gewählt werden kann
+  try { ev.target.value = ""; } catch(e) {}
+}
+
+// Backup + Löschen für ein komplettes Jahr
+function archiveAndDeleteYear(){
+  const year = _getSelectedArchiveYear();
+
+  const confirmMsg =
+    "Es wird zuerst ein Jahres-Backup für das Jahr " + year + " erstellt,\n" +
+    "und anschließend werden alle Daten dieses Jahres gelöscht.\n\n" +
+    "Fortfahren?";
+  if(!confirm(confirmMsg)) return;
+
+  const data = _buildYearArchiveData(year);
+  const defaultName = `einnahmen_${year}_gesamt.json`;
+  const msg =
+    "Backup-Dateiname für das Jahr " + year + ":\n\n" +
+    defaultName + "\n\n" +
+    "Nach dem Speichern werden alle Daten dieses Jahres gelöscht.\n\n" +
+    "OK = Speichern & Löschen, Abbrechen = nichts tun";
+  const ok = _downloadJsonData(data, defaultName, msg);
+  if(!ok) return;
+
+  // Schlüssel sammeln (nicht während des Iterierens löschen)
+  const keysToRemove = [];
+  for(let i = 0; i < localStorage.length; i++){
+    const k = localStorage.key(i);
+    if(!k) continue;
+    if(k.startsWith(`day-${year}-`) || k.startsWith(`cf-${year}-`) || k.startsWith(`locked-${year}-`)){
+      keysToRemove.push(k);
+    }
+  }
+  keysToRemove.forEach(k => localStorage.removeItem(k));
+
+  alert("Backup gespeichert. " + keysToRemove.length + " Einträge für " + year + " wurden gelöscht.");
+
+  // UI aktualisieren
+  if(typeof updateMonth === "function"){
+    updateMonth();
+  } else {
+    populateYearArchiveSelect();
+  }
+}
+
 </script>
 <style>
 /*
@@ -1478,7 +1689,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V231</h1>
+<h1>Einnahmen V232</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span><span id="month-lock-toggle" onclick="toggleLock()" style="cursor:pointer; font-size: 1.4em; margin-left: 10px;" title="Monat bearbeiten/sperren">🔓</span>
@@ -1541,6 +1752,21 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
   <button onclick="clearAllData()">Alle Daten löschen</button>
 </div>
 
+
+<div style="margin-top:12px; padding-top:10px; border-top:1px dashed #666;">
+  <div style="margin-bottom:6px; font-weight:bold;">Jahresarchiv</div>
+  <label for="year-archive-select">Jahr:</label>
+  <select id="year-archive-select"></select>
+  <div style="display:inline-block; margin-left:10px;">
+    <button class="modern-btn" onclick="exportYearArchive()">💾 Jahres-Backup speichern</button>
+    <br/>
+    <button class="modern-btn" onclick="archiveAndDeleteYear()" style="margin-top:6px;">🧹 Jahr archivieren &amp; löschen</button>
+  </div>
+  <div style="display:inline-block; margin-left:10px;">
+    <input accept="application/json" id="year-archive-input" onchange="importYearArchive(event)" style="display:none;" type="file"/>
+    <button onclick="document.getElementById('year-archive-input').click()">Jahres-Backup laden</button>
+  </div>
+</div>
 
 <div style="margin-top:10px;">
   <label for="quarter-select">Quartal:</label>
@@ -2737,7 +2963,11 @@ function generateYearOverview() {
     const adv = document.getElementById('advanced-controls');
     if(!input || !adv) return;
     const code = (input.value || '').trim();
-    adv.style.display = (code === '1202') ? 'block' : 'none';
+    const show = (code === '1202');
+    adv.style.display = show ? 'block' : 'none';
+    if(show && typeof populateYearArchiveSelect === 'function'){
+      populateYearArchiveSelect();
+    }
   }
 
   document.addEventListener('input', function(e){
