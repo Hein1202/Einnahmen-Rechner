@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V233</title>
+<title>Einnahmen V234</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -1427,7 +1427,7 @@ function _getSelectedArchiveYear(){
 function _buildYearArchiveData(year){
   const data = {
     app: "Einnahmen",
-    version: "V233",
+    version: "V234",
     year: year,
     createdAt: new Date().toISOString(),
     days: {},
@@ -1690,7 +1690,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V233</h1>
+<h1>Einnahmen V234</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span><span id="month-lock-toggle" onclick="toggleLock()" style="cursor:pointer; font-size: 1.4em; margin-left: 10px;" title="Monat bearbeiten/sperren">🔓</span>
@@ -1912,7 +1912,7 @@ function generateQuarterReducedPrint() {
                (tip && parseFloat(String(tip).replace(",", ".")) > 0);
       });
 
-      if (!hasEntries && freeType) {
+      if (freeType) {
         const dateStr = String(d).padStart(2, "0") + "." + String(m + 1).padStart(2, "0") + "." + year;
         const label = freeType === "urlaub"
           ? "Urlaubstag"
@@ -2085,7 +2085,7 @@ function exportQuarterExcel() {
                (tip && parseFloat(String(tip).replace(",", ".")) > 0);
       });
 
-      if (!hasEntries && freeType) {
+      if (freeType) {
         const label = freeType === "urlaub"
           ? "Urlaubstag"
           : (freeType === "krank" ? "Krankheitstag" : "Eigener freier Tag");
@@ -2867,6 +2867,13 @@ function generateYearOverview() {
       const raw = localStorage.getItem(key);
       if (raw) {
         try { rows = JSON.parse(raw); } catch (e) { rows = []; }
+      }
+
+      const freeKey = "cf-" + year + "-" + m + "-" + d;
+      const freeType = localStorage.getItem(freeKey);
+      if (freeType) {
+        // Freier Tag überschreibt evtl. alte gespeicherte Beträge: nicht als Einnahme zählen
+        continue;
       }
 
       let daySum = 0;
