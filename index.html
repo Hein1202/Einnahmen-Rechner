@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V237</title>
+<title>Einnahmen V242</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -1238,20 +1238,13 @@ function exportJSON(){
     + "Vorgeschlagener Dateiname:\n" + defaultName + "\n\n"
     + "Sie können den Dateinamen hier ändern oder einfach mit OK bestätigen.";
 
-  let filename = prompt(message, defaultName);
-  if (filename === null) {
-    // Benutzer hat Abbrechen gewählt → nicht speichern
-    return;
-  }
-  filename = filename.trim();
-  if (!filename) {
-    filename = defaultName;
-  }
+  // In einigen Offline-Umgebungen ist die prompt-Funktion deaktiviert.
+  // Daher speichern wir ohne Rückfrage mit dem vorgeschlagenen Dateinamen.
+  let filename = defaultName;
   if (!filename.toLowerCase().endsWith(".json")) {
     filename += ".json";
   }
-
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -1427,7 +1420,7 @@ function _getSelectedArchiveYear(){
 function _buildYearArchiveData(year){
   const data = {
     app: "Einnahmen",
-    version: "V237",
+    version: "V242",
     year: year,
     createdAt: new Date().toISOString(),
     days: {},
@@ -1457,14 +1450,38 @@ function _buildYearArchiveData(year){
   return data;
 }
 
-function _downloadJsonData(data, defaultName, promptMessage){
-  let filename = prompt(promptMessage || "Dateiname:", defaultName);
-  if (filename === null) return false; // Abbrechen
-  filename = (filename || "").trim();
-  if (!filename) filename = defaultName;
-  if (!filename.toLowerCase().endsWith(".json")) filename += ".json";
+async function _downloadJsonData(data, defaultName, promptMessage){
+  // JSON-Text vorbereiten
+  const jsonText = JSON.stringify(data, null, 2);
+  const baseName = (defaultName || "backup.json").trim() || "backup.json";
+  const ensureJsonExt = (name) => {
+    let n = (name || "").trim();
+    if (!n) n = baseName;
+    if (!n.toLowerCase().endsWith(".json")) n += ".json";
+    return n;
+  };
 
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+  // 1) Desktop-App (Electron): nativer „Speichern unter…“-Dialog + Schreiben via electronAPI
+  try{
+    if (window.electronAPI && typeof window.electronAPI.saveBinaryFile === "function"){
+      const result = await window.electronAPI.saveBinaryFile({
+        title: "Backup speichern",
+        defaultName: ensureJsonExt(baseName),
+        filters: [{ name: "JSON-Datei", extensions: ["json"] }],
+        data: jsonText,
+        encoding: "utf8"
+      });
+      return !!(result && !result.canceled);
+    }
+  }catch(e){
+    console.warn("JSON-Speichern (Desktop) fehlgeschlagen – Fallback auf Browser-Download.", e);
+    try{ alert("Desktop-Speichern ist fehlgeschlagen. Es wird der Browser-Download versucht.\n\nDetails: " + (e && e.message ? e.message : e)); }catch(_){ }
+  }
+
+  // 2) Browser: In manchen Offline-Umgebungen ist die prompt-Funktion deaktiviert.
+  // Daher verwenden wir ohne Rückfrage den vorgeschlagenen Dateinamen.
+  let filename = ensureJsonExt(baseName);
+const blob = new Blob([jsonText], {type:"application/json"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -1475,16 +1492,25 @@ function _downloadJsonData(data, defaultName, promptMessage){
 }
 
 // Manuelles Jahres-Backup (nur speichern)
-function exportYearArchive(){
+async function exportYearArchive(){
   const year = _getSelectedArchiveYear();
-  const data = _buildYearArchiveData(year);
-  const defaultName = `einnahmen_${year}_gesamt.json`;
-  const msg =
-    "Jahres-Backup für " + year + "\n\n" +
-    "Die Datei wird in Ihrem Standard-Download-Ordner gespeichert.\n\n" +
-    "Vorgeschlagener Dateiname:\n" + defaultName + "\n\n" +
-    "Sie können den Dateinamen hier ändern oder einfach mit OK bestätigen.";
-  _downloadJsonData(data, defaultName, msg);
+  try{
+    const data = _buildYearArchiveData(year);
+    const defaultName = `einnahmen_${year}_gesamt.json`;
+    const msg =
+      "Jahres-Backup für " + year + "\n\n" +
+      "Wenn Sie die Desktop-App nutzen, erscheint ein \"Speichern unter…\"-Dialog.\n" +
+      "Im Browser wird die Datei in den Download-Ordner geladen.\n\n" +
+      "Vorgeschlagener Dateiname:\n" + defaultName + "\n\n" +
+      "Sie können den Dateinamen hier ändern oder einfach mit OK bestätigen.";
+    const ok = await _downloadJsonData(data, defaultName, msg);
+    if(!ok){
+      alert("Jahres-Backup wurde abgebrochen oder konnte nicht gespeichert werden.");
+    }
+  }catch(err){
+    alert("Fehler beim Jahres-Backup: " + (err && err.message ? err.message : err));
+    console.error(err);
+  }
 }
 
 // Jahres-Backup laden (Restore)
@@ -1546,7 +1572,7 @@ function importYearArchive(ev){
 }
 
 // Backup + Löschen für ein komplettes Jahr
-function archiveAndDeleteYear(){
+async function archiveAndDeleteYear(){
   const year = _getSelectedArchiveYear();
 
   const confirmMsg =
@@ -1562,7 +1588,7 @@ function archiveAndDeleteYear(){
     defaultName + "\n\n" +
     "Nach dem Speichern werden alle Daten dieses Jahres gelöscht.\n\n" +
     "OK = Speichern & Löschen, Abbrechen = nichts tun";
-  const ok = _downloadJsonData(data, defaultName, msg);
+  const ok = await _downloadJsonData(data, defaultName, msg);
   if(!ok) return;
 
   // Schlüssel sammeln (nicht während des Iterierens löschen)
@@ -1690,7 +1716,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V237</h1>
+<h1>Einnahmen V242</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span><span id="month-lock-toggle" onclick="toggleLock()" style="cursor:pointer; font-size: 1.4em; margin-left: 10px;" title="Monat bearbeiten/sperren">🔓</span>
@@ -2838,13 +2864,13 @@ exportJSON = function () {
   }
 
   const defaultName = "einnahmen_" + selYear + "-" + String(selMonth+1).padStart(2,"0") + ".json";
-  let filename = prompt("Dateiname:", defaultName);
-  if (!filename) return;
+  // In einigen Offline-Umgebungen ist die prompt-Funktion deaktiviert.
+  // Daher speichern wir ohne Rückfrage mit dem vorgeschlagenen Dateinamen.
+  let filename = defaultName;
   if (!filename.toLowerCase().endsWith(".json")) {
     filename += ".json";
   }
-
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
