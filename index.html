@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V242</title>
+<title>Einnahmen V247</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -1212,12 +1212,13 @@ function updateTotals(){
 }
 
 // JSON Export / Import
-function exportJSON(){
+async function exportJSON(){
   const data = {
     year: selYear,
     month: selMonth,
     days: {},
-    free: {}
+    free: {},
+    locked: {}
   };
 
   for(let d = 1; d <= selDays; d++){
@@ -1230,27 +1231,25 @@ function exportJSON(){
     if(freeVal) data.free[cf] = freeVal;
   }
 
+  // Monatssperre (falls gesetzt)
+  const lockKey = `locked-${selYear}-${selMonth}`;
+  const lockVal = localStorage.getItem(lockKey);
+  if(lockVal != null) data.locked[lockKey] = lockVal;
+
   // Standard-Dateinamen vorschlagen
   const defaultName = "einnahmen_" + selYear + "-" + String(selMonth+1).padStart(2,"0") + ".json";
 
-  // Hinweis, wo gespeichert wird, und Möglichkeit zur Umbenennung
-  const message = "Die Datei wird in Ihrem Standard-Download-Ordner gespeichert (z.B. 'Downloads').\n\n"
-    + "Vorgeschlagener Dateiname:\n" + defaultName + "\n\n"
-    + "Sie können den Dateinamen hier ändern oder einfach mit OK bestätigen.";
+  // Hinweis (Desktop: "Speichern unter…", Browser: Download-Ordner)
+  const message =
+    "Export für den ausgewählten Monat\n\n" +
+    "Desktop-App: Es erscheint ein \"Speichern unter…\"-Dialog.\n" +
+    "Browser: Die Datei wird in Ihrem Download-Ordner gespeichert.\n\n" +
+    "Vorgeschlagener Dateiname:\n" + defaultName;
 
-  // In einigen Offline-Umgebungen ist die prompt-Funktion deaktiviert.
-  // Daher speichern wir ohne Rückfrage mit dem vorgeschlagenen Dateinamen.
-  let filename = defaultName;
-  if (!filename.toLowerCase().endsWith(".json")) {
-    filename += ".json";
+  const ok = await _downloadJsonData(data, defaultName, message);
+  if(!ok){
+    alert("Export wurde abgebrochen oder konnte nicht gespeichert werden.");
   }
-const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 function importJSON(ev){
@@ -1266,6 +1265,7 @@ function importJSON(ev){
           localStorage.setItem(key, JSON.stringify(data.days[key]));
         }
       }
+
       if(data.free){
         for(const key in data.free){
           const val = data.free[key];
@@ -1280,6 +1280,12 @@ function importJSON(ev){
           }
         }
       }
+      if(data.locked){
+        for(const key in data.locked){
+          const v = data.locked[key];
+          if(v != null) localStorage.setItem(key, String(v));
+        }
+      }
       alert("Import erfolgreich. Seite wird neu geladen.");
       location.reload();
     }catch(err){
@@ -1289,8 +1295,102 @@ function importJSON(ev){
   reader.readAsText(file);
 }
 
+
+// Desktop-App: Schutz gegen dauerhaft blockierte Eingaben nach Systemdialog/Download
+window.__uiBusy = false;
+function setUiBusy(isBusy){
+  window.__uiBusy = !!isBusy;
+  try { applyLockStatus(); } catch(_) {}
+}
+function _restoreUiAfterAsyncOp(){
+  // Falls ein Druck-/Overlay-Bereich sichtbar blieb, sicher ausblenden
+  try {
+    const rp = document.getElementById('reduced-print');
+    if (rp) rp.style.display = 'none';
+  } catch(_) {}
+  // Pointer-Events sicherheitshalber wieder aktivieren
+  try { document.body.style.pointerEvents = ''; } catch(_) {}
+  // Eingaben sicher wieder aktivieren (Navigation bleibt immer nutzbar)
+  try {
+    document.querySelectorAll('input, button, select, textarea').forEach(el => {
+      if (!el.classList.contains('nav-btn') && el.id !== 'month-lock-toggle' && !el.closest('#month-nav')) {
+        el.disabled = false;
+      }
+    });
+  } catch(_) {}
+  // Sperrstatus (Monatssperre) erneut anwenden
+  try { applyLockStatus(); } catch(_) {}
+  // Fokus zurückholen
+  try { window.focus(); } catch(_) {}
+  try { setTimeout(() => { try { window.focus(); } catch(_) {} }, 0); } catch(_) {}
+}
+
+
+
+// Notfall-/Selbstheilung: UI entsperren (falls die Desktop-App nach einem Datei-Dialog in einem disabled-Zustand "haengen" bleibt)
+function forceUnblockEditorUI(){
+  // Busy-Flag vorsorglich loeschen (sollte keine Persistenz haben)
+  try { window.__uiBusy = false; } catch(_) {}
+
+  // Druckbereich sicher ausblenden
+  try { const rp = document.getElementById('reduced-print'); if (rp) rp.style.display = 'none'; } catch(_) {}
+  // Pointer-Events sicherheitshalber wieder aktivieren
+  try { document.body.style.pointerEvents = ''; } catch(_) {}
+
+  let locked = false;
+  try { locked = (typeof isMonthLocked === 'function') ? isMonthLocked(selYear, selMonth) : false; } catch(_) { locked = false; }
+
+  // Wenn NICHT gesperrt: alle Eingaben/Buttons (ausser Navigation) wieder aktivieren
+  if(!locked){
+    try {
+      document.querySelectorAll('input, button, select, textarea').forEach(el => {
+        if (!el.classList.contains('nav-btn') && el.id !== 'month-lock-toggle' && !el.closest('#month-nav')) {
+          el.disabled = false;
+        }
+      });
+    } catch(_) {}
+  }
+
+  // Sperrstatus sauber anwenden (falls doch gesperrt)
+  try { applyLockStatus(); } catch(_) {}
+}
+
+let __unblockWatchdogId = null;
+function startUnblockWatchdog(ms=5000){
+  const until = Date.now() + (ms || 5000);
+  try { if(__unblockWatchdogId) { clearInterval(__unblockWatchdogId); __unblockWatchdogId = null; } } catch(_) {}
+  __unblockWatchdogId = setInterval(() => {
+    try {
+      if(Date.now() > until){
+        clearInterval(__unblockWatchdogId);
+        __unblockWatchdogId = null;
+        return;
+      }
+      const locked = (typeof isMonthLocked === 'function') ? isMonthLocked(selYear, selMonth) : false;
+      if(locked) return;
+      const disabledCount = document.querySelectorAll('#main-table input:disabled, #main-table button:disabled, #main-table select:disabled, #main-table textarea:disabled').length;
+      if(disabledCount > 0){
+        forceUnblockEditorUI();
+      }
+    } catch(_) {}
+  }, 200);
+}
+
+// Nach Systemdialogen ("Speichern unter...") kommt der Fokus oft "spaet" zurueck.
+// Dann ggf. automatisch entsperren.
+try {
+  window.addEventListener('focus', () => {
+    setTimeout(() => { try { forceUnblockEditorUI(); startUnblockWatchdog(1500); } catch(_) {} }, 50);
+  });
+  document.addEventListener('visibilitychange', () => {
+    if(!document.hidden){
+      setTimeout(() => { try { forceUnblockEditorUI(); startUnblockWatchdog(1500); } catch(_) {} }, 50);
+    }
+  });
+} catch(_) {}
+
 // Alle gespeicherten Daten löschen
-function clearAllData(){
+async function clearAllData(){
   // Hinweis mit Backup-Info und Bezug auf den aktuellen Monat
   const monthLabel = (selMonth + 1).toString().padStart(2, "0") + "." + selYear;
   const confirmMsg =
@@ -1298,16 +1398,21 @@ function clearAllData(){
     "und anschließend werden alle Daten dieses Monats gelöscht.\n\n" +
     "Fortfahren?";
 
+
   if (!confirm(confirmMsg)) {
     return;
   }
+
+  setUiBusy(true);
+  try {
 
   // Zuerst automatische Sicherung des aktuellen Monats als JSON
   const data = {
     year: selYear,
     month: selMonth,
     days: {},
-    free: {}
+    free: {},
+    locked: {}
   };
 
   for (let d = 1; d <= selDays; d++) {
@@ -1320,19 +1425,25 @@ function clearAllData(){
     if (freeVal) data.free[cf] = freeVal;
   }
 
+  // Monatssperre (falls gesetzt)
+  const lockKey = `locked-${selYear}-${selMonth}`;
+  const lockVal = localStorage.getItem(lockKey);
+  if(lockVal != null) data.locked[lockKey] = lockVal;
+
   const backupName = "backup_einnahmen_" +
     selYear + "-" + String(selMonth + 1).padStart(2, "0") + ".json";
 
-  try {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = backupName;
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch (e) {
-    console.error("Backup konnte nicht erstellt werden:", e);
+  const msg =
+    "Backup für den aktuell ausgewählten Monat (" + monthLabel + ")\n\n" +
+    "Desktop-App: Es erscheint ein \"Speichern unter…\"-Dialog.\n" +
+    "Browser: Die Datei wird in Ihrem Download-Ordner gespeichert.\n\n" +
+    "Vorgeschlagener Dateiname:\n" + backupName;
+
+
+  const ok = await _downloadJsonData(data, backupName, msg);
+  if(!ok){
+    alert("Backup wurde abgebrochen oder konnte nicht gespeichert werden. Es wird nichts gelöscht.");
+    return;
   }
 
   // Danach nur die Daten des aktuellen Monats aus dem Speicher entfernen
@@ -1342,10 +1453,23 @@ function clearAllData(){
     const cf = "cf-" + selYear + "-" + selMonth + "-" + d;
     localStorage.removeItem(cf);
   }
+
+  // Wichtig: Monatssperre ebenfalls entfernen, sonst bleibt der Monat nach dem Löschen „gesperrt“
+  localStorage.removeItem(lockKey);
+
   localStorage.removeItem("totalTip");
 
   alert("Backup erstellt. Alle Daten für den Monat " + monthLabel + " wurden gelöscht.");
-  location.reload();
+
+  // UI sofort wieder freigeben (ohne App-Neustart)
+  try { if (typeof hideMissingDayHint === "function") hideMissingDayHint(); } catch(_) {}
+  try { if (typeof updateMonth === "function") { updateMonth(); } else { location.reload(); } } catch(_) { try { location.reload(); } catch(__) {} }
+  try { if (typeof applyLockStatus === "function") applyLockStatus(); } catch(_) {}
+  } finally {
+    setUiBusy(false);
+    _restoreUiAfterAsyncOp();
+    try { forceUnblockEditorUI(); startUnblockWatchdog(5000); } catch(_) {}
+  }
 }
 
 
@@ -1420,7 +1544,7 @@ function _getSelectedArchiveYear(){
 function _buildYearArchiveData(year){
   const data = {
     app: "Einnahmen",
-    version: "V242",
+    version: "V246",
     year: year,
     createdAt: new Date().toISOString(),
     days: {},
@@ -1481,13 +1605,17 @@ async function _downloadJsonData(data, defaultName, promptMessage){
   // 2) Browser: In manchen Offline-Umgebungen ist die prompt-Funktion deaktiviert.
   // Daher verwenden wir ohne Rückfrage den vorgeschlagenen Dateinamen.
   let filename = ensureJsonExt(baseName);
-const blob = new Blob([jsonText], {type:"application/json"});
+  const blob = new Blob([jsonText], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
+  a.style.display = "none";
   a.href = url;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  try { window.focus(); } catch(_) {}
   return true;
 }
 
@@ -1581,6 +1709,9 @@ async function archiveAndDeleteYear(){
     "Fortfahren?";
   if(!confirm(confirmMsg)) return;
 
+  setUiBusy(true);
+  try {
+
   const data = _buildYearArchiveData(year);
   const defaultName = `einnahmen_${year}_gesamt.json`;
   const msg =
@@ -1609,6 +1740,11 @@ async function archiveAndDeleteYear(){
     updateMonth();
   } else {
     populateYearArchiveSelect();
+  }
+  } finally {
+    setUiBusy(false);
+    _restoreUiAfterAsyncOp();
+    try { forceUnblockEditorUI(); startUnblockWatchdog(5000); } catch(_) {}
   }
 }
 
@@ -1713,10 +1849,10 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 }
 
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></head>
+</head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V242</h1>
+<h1>Einnahmen V247 (Offline)</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span><span id="month-lock-toggle" onclick="toggleLock()" style="cursor:pointer; font-size: 1.4em; margin-left: 10px;" title="Monat bearbeiten/sperren">🔓</span>
@@ -2060,70 +2196,309 @@ const rp = document.getElementById("reduced-print");
 
 
 
-// Speichern von Excel-Dateien:
-// - Browser: normaler Download (XLSX.writeFile oder Blob)
-// - Desktop-App (Electron): Speichern-Dialog + Schreiben via electronAPI
-async function saveWorkbookToFile(wb, defaultName) {
-  // XLSX vorhanden?
-  if (typeof XLSX === "undefined") {
-    alert(
-      "Excel-Export nicht möglich, weil die XLSX-Bibliothek nicht geladen wurde.\n\n" +
-      "Tipp: Im Browser benötigst du eine Internetverbindung (CDN). Offline funktioniert der Excel-Export in der Desktop-App."
-    );
-    return false;
+
+
+// Offline-Excel-Export (XLSX) ohne externe Bibliotheken
+// Erzeugt eine minimale .xlsx-Datei (ZIP + Office Open XML) direkt im Browser.
+// Unterstützt Text und Zahlen (Zahlen werden automatisch erkannt, auch mit deutschem Komma).
+(function(){
+  function _xlsxEscapeXml(s){
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;")
+      .replace(/'/g, "&apos;");
   }
 
-  // 1) Desktop (Electron): nativer „Speichern unter…“-Dialog
-  try {
-    if (window.electronAPI && typeof window.electronAPI.saveBinaryFile === "function") {
-      const data = XLSX.write(wb, { bookType: "xlsx", type: "array" }); // ArrayBuffer/Uint8Array
-      const result = await window.electronAPI.saveBinaryFile({
-        title: "Excel speichern",
-        defaultName: defaultName || "export.xlsx",
-        filters: [{ name: "Excel-Datei", extensions: ["xlsx"] }],
-        data
-      });
-      return !!(result && !result.canceled);
+  function _xlsxSanitizeSheetName(name){
+    let n = String(name || "Tabelle1");
+    // Excel: max 31 chars, no : \/ ? * [ ]
+    n = n.replace(/[\\\/:\?\*\[\]]/g, " ").trim();
+    if (!n) n = "Tabelle1";
+    if (n.length > 31) n = n.slice(0, 31);
+    return n;
+  }
+
+  function _colName(idx){
+    // 0 -> A, 25 -> Z, 26 -> AA
+    let n = idx + 1;
+    let s = "";
+    while (n > 0){
+      const r = (n - 1) % 26;
+      s = String.fromCharCode(65 + r) + s;
+      n = Math.floor((n - 1) / 26);
     }
-  } catch (e) {
-    console.warn("Excel-Speichern (Desktop) fehlgeschlagen – Fallback auf Browser-Download.", e);
+    return s;
   }
 
-  // 2) Browser-Fallback: XLSX.writeFile
-  try {
-    if (typeof XLSX.writeFile === "function") {
-      XLSX.writeFile(wb, defaultName || "export.xlsx");
+  function _cellRef(c, r){
+    return _colName(c) + String(r + 1);
+  }
+
+  function _inferCell(v){
+    if (v === null || v === undefined) return { type: "empty", value: "" };
+
+    if (typeof v === "number" && isFinite(v)) {
+      return { type: "n", value: String(v) };
+    }
+
+    // Strings: try parse numbers (also German comma)
+    const s = String(v).trim();
+    if (!s) return { type: "empty", value: "" };
+
+    // Prevent formula injection: prefix with apostrophe if it starts with Excel formula chars
+    const maybeFormula = /^[=+\-@]/.test(s);
+
+    const numLike = /^-?(\d+)([\.,]\d+)?$/.test(s);
+    if (numLike) {
+      const n = parseFloat(s.replace(',', '.'));
+      if (isFinite(n)) return { type: "n", value: String(n) };
+    }
+
+    return { type: "s", value: maybeFormula ? ("'" + s) : s };
+  }
+
+  function _buildSheetXml(aoa){
+    const rows = Array.isArray(aoa) ? aoa : [];
+    let out = '';
+    out += '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    out += '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">';
+    out += '<sheetData>';
+
+    for (let r = 0; r < rows.length; r++){
+      const row = Array.isArray(rows[r]) ? rows[r] : [rows[r]];
+      out += `<row r="${r+1}">`;
+
+      for (let c = 0; c < row.length; c++){
+        const cell = _inferCell(row[c]);
+        if (cell.type === 'empty') continue;
+        const ref = _cellRef(c, r);
+
+        if (cell.type === 'n') {
+          out += `<c r="${ref}"><v>${_xlsxEscapeXml(cell.value)}</v></c>`;
+        } else {
+          out += `<c r="${ref}" t="inlineStr"><is><t>${_xlsxEscapeXml(cell.value)}</t></is></c>`;
+        }
+      }
+
+      out += '</row>';
+    }
+
+    out += '</sheetData>';
+    out += '</worksheet>';
+    return out;
+  }
+
+  function _u8(str){
+    return new TextEncoder().encode(str);
+  }
+
+  // CRC32
+  const _crcTable = (() => {
+    const table = new Uint32Array(256);
+    for (let i = 0; i < 256; i++){
+      let c = i;
+      for (let k = 0; k < 8; k++){
+        c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      }
+      table[i] = c >>> 0;
+    }
+    return table;
+  })();
+
+  function _crc32(u8){
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < u8.length; i++){
+      crc = _crcTable[(crc ^ u8[i]) & 0xFF] ^ (crc >>> 8);
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function _concatU8(chunks){
+    let total = 0;
+    for (const c of chunks) total += c.length;
+    const out = new Uint8Array(total);
+    let off = 0;
+    for (const c of chunks){
+      out.set(c, off);
+      off += c.length;
+    }
+    return out;
+  }
+
+  function _makeLocalHeader(nameBytes, crc, size){
+    const header = new Uint8Array(30 + nameBytes.length);
+    const dv = new DataView(header.buffer);
+    dv.setUint32(0, 0x04034b50, true);
+    dv.setUint16(4, 20, true);
+    dv.setUint16(6, 0, true);
+    dv.setUint16(8, 0, true);
+    dv.setUint16(10, 0, true);
+    dv.setUint16(12, 0, true);
+    dv.setUint32(14, crc, true);
+    dv.setUint32(18, size, true);
+    dv.setUint32(22, size, true);
+    dv.setUint16(26, nameBytes.length, true);
+    dv.setUint16(28, 0, true);
+    header.set(nameBytes, 30);
+    return header;
+  }
+
+  function _makeCentralHeader(nameBytes, crc, size, offset){
+    const header = new Uint8Array(46 + nameBytes.length);
+    const dv = new DataView(header.buffer);
+    dv.setUint32(0, 0x02014b50, true);
+    dv.setUint16(4, 20, true); // version made by
+    dv.setUint16(6, 20, true); // version needed
+    dv.setUint16(8, 0, true);
+    dv.setUint16(10, 0, true);
+    dv.setUint16(12, 0, true);
+    dv.setUint16(14, 0, true);
+    dv.setUint32(16, crc, true);
+    dv.setUint32(20, size, true);
+    dv.setUint32(24, size, true);
+    dv.setUint16(28, nameBytes.length, true);
+    dv.setUint16(30, 0, true);
+    dv.setUint16(32, 0, true);
+    dv.setUint16(34, 0, true);
+    dv.setUint16(36, 0, true);
+    dv.setUint32(38, 0, true);
+    dv.setUint32(42, offset, true);
+    header.set(nameBytes, 46);
+    return header;
+  }
+
+  function _makeEndCentralDir(numEntries, centralSize, centralOffset){
+    const eocd = new Uint8Array(22);
+    const dv = new DataView(eocd.buffer);
+    dv.setUint32(0, 0x06054b50, true);
+    dv.setUint16(4, 0, true);
+    dv.setUint16(6, 0, true);
+    dv.setUint16(8, numEntries, true);
+    dv.setUint16(10, numEntries, true);
+    dv.setUint32(12, centralSize, true);
+    dv.setUint32(16, centralOffset, true);
+    dv.setUint16(20, 0, true);
+    return eocd;
+  }
+
+  function _zipStore(files){
+    const localParts = [];
+    const centralParts = [];
+    let offset = 0;
+
+    for (const f of files){
+      const nameBytes = _u8(f.name);
+      const data = f.data;
+      const size = data.length;
+      const crc = _crc32(data);
+
+      const localHeader = _makeLocalHeader(nameBytes, crc, size);
+      localParts.push(localHeader, data);
+
+      const centralHeader = _makeCentralHeader(nameBytes, crc, size, offset);
+      centralParts.push(centralHeader);
+
+      offset += localHeader.length + data.length;
+    }
+
+    const centralOffset = offset;
+    const centralBlob = _concatU8(centralParts);
+    const centralSize = centralBlob.length;
+    const eocd = _makeEndCentralDir(files.length, centralSize, centralOffset);
+
+    return _concatU8([_concatU8(localParts), centralBlob, eocd]);
+  }
+
+  function buildMinimalXlsxBinary(aoa, sheetName){
+    const safeName = _xlsxSanitizeSheetName(sheetName || 'Tabelle1');
+
+    const sheetXml = _buildSheetXml(aoa);
+    const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
+      `<sheets><sheet name="${_xlsxEscapeXml(safeName)}" sheetId="1" r:id="rId1"/></sheets>` +
+      `</workbook>`;
+
+    const relsRoot = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+      `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>` +
+      `</Relationships>`;
+
+    const relsWb = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+      `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>` +
+      `</Relationships>`;
+
+    const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
+      `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>` +
+      `<Default Extension="xml" ContentType="application/xml"/>` +
+      `<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>` +
+      `<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>` +
+      `</Types>`;
+
+    const files = [
+      { name: '[Content_Types].xml', data: _u8(contentTypes) },
+      { name: '_rels/.rels', data: _u8(relsRoot) },
+      { name: 'xl/workbook.xml', data: _u8(workbookXml) },
+      { name: 'xl/_rels/workbook.xml.rels', data: _u8(relsWb) },
+      { name: 'xl/worksheets/sheet1.xml', data: _u8(sheetXml) },
+    ];
+
+    return _zipStore(files);
+  }
+
+  async function saveAoAToXlsxFile(aoa, sheetName, defaultName){
+    const filename = (defaultName && String(defaultName).trim()) ? String(defaultName).trim() : 'export.xlsx';
+    const ensureXlsx = (n) => n.toLowerCase().endsWith('.xlsx') ? n : (n + '.xlsx');
+    const finalName = ensureXlsx(filename);
+
+    const data = buildMinimalXlsxBinary(aoa, sheetName || 'Tabelle1'); // Uint8Array
+
+    // 1) Desktop (Electron)
+    try {
+      if (window.electronAPI && typeof window.electronAPI.saveBinaryFile === 'function') {
+        const result = await window.electronAPI.saveBinaryFile({
+          title: 'Excel speichern',
+          defaultName: finalName,
+          filters: [{ name: 'Excel-Datei', extensions: ['xlsx'] }],
+          data
+        });
+        return !!(result && !result.canceled);
+      }
+    } catch (e) {
+      console.warn('Excel-Speichern (Desktop) fehlgeschlagen – Fallback auf Browser-Download.', e);
+    }
+
+    // 2) Browser Download
+    try {
+      const blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = finalName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
       return true;
+    } catch (e) {
+      console.error('Excel-Export fehlgeschlagen:', e);
+      try { alert('Excel-Export fehlgeschlagen: ' + (e && e.message ? e.message : e)); } catch(_) {}
+      return false;
     }
-  } catch (e) {
-    console.warn("XLSX.writeFile fehlgeschlagen – Fallback auf Blob-Download.", e);
   }
 
-  // 3) Letzter Fallback: Blob-Download
-  try {
-    const data = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    const blob = new Blob([data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = defaultName || "export.xlsx";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    return true;
-  } catch (e) {
-    console.error("Excel-Export fehlgeschlagen:", e);
-    alert("Excel-Export fehlgeschlagen: " + (e && e.message ? e.message : e));
-    return false;
-  }
-}
+  // Exportfunktion global verfügbar machen
+  window.saveAoAToXlsxFile = saveAoAToXlsxFile;
+})();
+
 
 async function exportQuarterExcel() {
   const q = getSelectedQuarter();
   const months = getQuarterMonths(q);
   const year = selYear;
-  const wb = XLSX.utils.book_new();
   const ws_data = [];
   // Titelzeile + Leerzeile (für den Excel-Ausdruck / Archiv)
   ws_data.push([`Einnahmen Quartal Q${q} ${year}`]);
@@ -2271,11 +2646,8 @@ ws_data.push([]);
     ws_data.push(["Gesamtanzahl Kunden", String(grandCustomers)]);
       ws_data.push(["Gesamtanzahl Arbeitstage", String(grandWorkdays)]);
 }
-
-  const ws = XLSX.utils.aoa_to_sheet(ws_data);
-  XLSX.utils.book_append_sheet(wb, ws, "Quartal");
   const defaultName = `einnahmen_quartal_Q${q}_${year}.xlsx`;
-  await saveWorkbookToFile(wb, defaultName);
+  await saveAoAToXlsxFile(ws_data, 'Quartal', defaultName);
 }
 function generateReducedPrint() {
   let output = "";
@@ -2649,8 +3021,7 @@ function scrollBackToLastEntry() {
 }
 </script>
 <script>
-function exportExcel() {
-  const wb = XLSX.utils.book_new();
+async function exportExcel() {
   const ws_data = [];
 
   // Titelzeile + Leerzeile (für den Excel-Ausdruck / Archiv)
@@ -2788,11 +3159,8 @@ else {
   ws_data.push(["Gesamtanzahl Kunden:", totalCustomers]);
 
     ws_data.push(["Gesamtanzahl Arbeitstage:", totalWorkdays]);
-const ws = XLSX.utils.aoa_to_sheet(ws_data);
-  XLSX.utils.book_append_sheet(wb, ws, "Einnahmen");
-
   const filename = `Einnahmen_${selYear}-${String(selMonth+1).padStart(2,"0")}.xlsx`;
-  XLSX.writeFile(wb, filename);
+  await saveAoAToXlsxFile(ws_data, 'Einnahmen', filename);
 }
 
 </script>
@@ -2811,6 +3179,8 @@ function setMonthLocked(year, month, locked) {
 }
 
 function toggleLock() {
+  // Während eines Systemdialogs/Downloads keine Sperre umschalten
+  if (window.__uiBusy) return;
   const locked = isMonthLocked(selYear, selMonth);
   setMonthLocked(selYear, selMonth, !locked);
   applyLockStatus();
@@ -2818,19 +3188,20 @@ function toggleLock() {
 
 function applyLockStatus() {
   const locked = isMonthLocked(selYear, selMonth);
+  const shouldDisable = locked;
   const lockIcon = document.getElementById("month-lock-toggle");
   if (lockIcon) {
     lockIcon.textContent = locked ? "🔒" : "🔓";
     lockIcon.title = locked ? "Monat ist gesperrt. Klick zum Entsperren." : "Monat ist offen. Klick zum Sperren.";
   }
 
-  document.querySelectorAll("input, button").forEach(el => {
+  document.querySelectorAll("input, button, select, textarea").forEach(el => {
     if (
       !el.classList.contains("nav-btn") &&
       el.id !== "month-lock-toggle" &&
       !el.closest("#month-nav")
     ) {
-      el.disabled = locked;
+      el.disabled = shouldDisable;
     }
   });
 }
@@ -3009,11 +3380,11 @@ function generateYearOverview() {
     output += "\n";
     output += "Jahresgesamt " + year + "\n";
     output += "-------------------------\n";
-    output += "Brutto: ".padEnd(12) + fmt(grandTotal).padStart(10) + "\n";
-    output += "Netto: ".padEnd(12) + fmt(netto).padStart(10) + "\n";
-    output += "MwSt: ".padEnd(12) + fmt(mwst).padStart(10) + "\n";
-    output += "Kunden: ".padEnd(12) + String(grandCustomers).padStart(10) + "\n";
-    output += "Arbeitstage: ".padEnd(12) + String(grandWorkdays).padStart(10) + "\n";
+    output += "Brutto: ".padEnd(13) + fmt(grandTotal).padStart(10) + "\n";
+    output += "Netto: ".padEnd(13) + fmt(netto).padStart(10) + "\n";
+    output += "MwSt: ".padEnd(13) + fmt(mwst).padStart(10) + "\n";
+    output += "Kunden: ".padEnd(13) + String(grandCustomers).padStart(10) + "\n";
+    output += "Arbeitstage: ".padEnd(13) + String(grandWorkdays).padStart(10) + "\n";
   } else {
     output += "Für das Jahr " + year + " liegen keine Einträge vor.\n";
   }
