@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V247</title>
+<title>Einnahmen V249.01.26</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -1212,13 +1212,12 @@ function updateTotals(){
 }
 
 // JSON Export / Import
-async function exportJSON(){
+function exportJSON(){
   const data = {
     year: selYear,
     month: selMonth,
     days: {},
-    free: {},
-    locked: {}
+    free: {}
   };
 
   for(let d = 1; d <= selDays; d++){
@@ -1231,25 +1230,27 @@ async function exportJSON(){
     if(freeVal) data.free[cf] = freeVal;
   }
 
-  // Monatssperre (falls gesetzt)
-  const lockKey = `locked-${selYear}-${selMonth}`;
-  const lockVal = localStorage.getItem(lockKey);
-  if(lockVal != null) data.locked[lockKey] = lockVal;
-
   // Standard-Dateinamen vorschlagen
   const defaultName = "einnahmen_" + selYear + "-" + String(selMonth+1).padStart(2,"0") + ".json";
 
-  // Hinweis (Desktop: "Speichern unter…", Browser: Download-Ordner)
-  const message =
-    "Export für den ausgewählten Monat\n\n" +
-    "Desktop-App: Es erscheint ein \"Speichern unter…\"-Dialog.\n" +
-    "Browser: Die Datei wird in Ihrem Download-Ordner gespeichert.\n\n" +
-    "Vorgeschlagener Dateiname:\n" + defaultName;
+  // Hinweis, wo gespeichert wird, und Möglichkeit zur Umbenennung
+  const message = "Die Datei wird in Ihrem Standard-Download-Ordner gespeichert (z.B. 'Downloads').\n\n"
+    + "Vorgeschlagener Dateiname:\n" + defaultName + "\n\n"
+    + "Sie können den Dateinamen hier ändern oder einfach mit OK bestätigen.";
 
-  const ok = await _downloadJsonData(data, defaultName, message);
-  if(!ok){
-    alert("Export wurde abgebrochen oder konnte nicht gespeichert werden.");
+  // In einigen Offline-Umgebungen ist die prompt-Funktion deaktiviert.
+  // Daher speichern wir ohne Rückfrage mit dem vorgeschlagenen Dateinamen.
+  let filename = defaultName;
+  if (!filename.toLowerCase().endsWith(".json")) {
+    filename += ".json";
   }
+const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function importJSON(ev){
@@ -1265,7 +1266,6 @@ function importJSON(ev){
           localStorage.setItem(key, JSON.stringify(data.days[key]));
         }
       }
-
       if(data.free){
         for(const key in data.free){
           const val = data.free[key];
@@ -1280,14 +1280,29 @@ function importJSON(ev){
           }
         }
       }
-      if(data.locked){
-        for(const key in data.locked){
-          const v = data.locked[key];
-          if(v != null) localStorage.setItem(key, String(v));
-        }
+      /* Import ohne Reload: UI sofort aktualisieren */
+      // Optional: nach Import auf den importierten Monat springen
+      if (data && data.year != null && !Number.isNaN(Number(data.year))) selYear = Number(data.year);
+      if (data && data.month != null && !Number.isNaN(Number(data.month))) selMonth = Number(data.month);
+
+      // Sperrstatus: wenn im Import nicht vorhanden, Monat entsperren (stale locks vermeiden)
+      const importedLocked = (data && Object.prototype.hasOwnProperty.call(data, "locked"))
+        ? (data.locked === true || data.locked === 1 || data.locked === "1")
+        : false;
+      if (typeof setMonthLocked === "function") {
+        setMonthLocked(selYear, selMonth, importedLocked);
+      } else if (importedLocked) {
+        localStorage.setItem(`locked-${selYear}-${selMonth}`, "1");
+      } else {
+        localStorage.removeItem(`locked-${selYear}-${selMonth}`);
       }
-      alert("Import erfolgreich. Seite wird neu geladen.");
-      location.reload();
+
+      try { hideMissingDayHint(); } catch(e) {}
+      try { updateMonth(); } catch(e) { console.error(e); }
+      try { applyLockStatus(); } catch(e) {}
+      alert("Import erfolgreich.");
+      try { ev.target.value = ""; } catch(e) {}
+      try { if (typeof refocusAfterNativeDialogs === 'function') refocusAfterNativeDialogs(); } catch(e) {}
     }catch(err){
       alert("Fehler beim Import: " + err.message);
     }
@@ -1295,102 +1310,8 @@ function importJSON(ev){
   reader.readAsText(file);
 }
 
-
-// Desktop-App: Schutz gegen dauerhaft blockierte Eingaben nach Systemdialog/Download
-window.__uiBusy = false;
-function setUiBusy(isBusy){
-  window.__uiBusy = !!isBusy;
-  try { applyLockStatus(); } catch(_) {}
-}
-function _restoreUiAfterAsyncOp(){
-  // Falls ein Druck-/Overlay-Bereich sichtbar blieb, sicher ausblenden
-  try {
-    const rp = document.getElementById('reduced-print');
-    if (rp) rp.style.display = 'none';
-  } catch(_) {}
-  // Pointer-Events sicherheitshalber wieder aktivieren
-  try { document.body.style.pointerEvents = ''; } catch(_) {}
-  // Eingaben sicher wieder aktivieren (Navigation bleibt immer nutzbar)
-  try {
-    document.querySelectorAll('input, button, select, textarea').forEach(el => {
-      if (!el.classList.contains('nav-btn') && el.id !== 'month-lock-toggle' && !el.closest('#month-nav')) {
-        el.disabled = false;
-      }
-    });
-  } catch(_) {}
-  // Sperrstatus (Monatssperre) erneut anwenden
-  try { applyLockStatus(); } catch(_) {}
-  // Fokus zurückholen
-  try { window.focus(); } catch(_) {}
-  try { setTimeout(() => { try { window.focus(); } catch(_) {} }, 0); } catch(_) {}
-}
-
-
-
-// Notfall-/Selbstheilung: UI entsperren (falls die Desktop-App nach einem Datei-Dialog in einem disabled-Zustand "haengen" bleibt)
-function forceUnblockEditorUI(){
-  // Busy-Flag vorsorglich loeschen (sollte keine Persistenz haben)
-  try { window.__uiBusy = false; } catch(_) {}
-
-  // Druckbereich sicher ausblenden
-  try { const rp = document.getElementById('reduced-print'); if (rp) rp.style.display = 'none'; } catch(_) {}
-  // Pointer-Events sicherheitshalber wieder aktivieren
-  try { document.body.style.pointerEvents = ''; } catch(_) {}
-
-  let locked = false;
-  try { locked = (typeof isMonthLocked === 'function') ? isMonthLocked(selYear, selMonth) : false; } catch(_) { locked = false; }
-
-  // Wenn NICHT gesperrt: alle Eingaben/Buttons (ausser Navigation) wieder aktivieren
-  if(!locked){
-    try {
-      document.querySelectorAll('input, button, select, textarea').forEach(el => {
-        if (!el.classList.contains('nav-btn') && el.id !== 'month-lock-toggle' && !el.closest('#month-nav')) {
-          el.disabled = false;
-        }
-      });
-    } catch(_) {}
-  }
-
-  // Sperrstatus sauber anwenden (falls doch gesperrt)
-  try { applyLockStatus(); } catch(_) {}
-}
-
-let __unblockWatchdogId = null;
-function startUnblockWatchdog(ms=5000){
-  const until = Date.now() + (ms || 5000);
-  try { if(__unblockWatchdogId) { clearInterval(__unblockWatchdogId); __unblockWatchdogId = null; } } catch(_) {}
-  __unblockWatchdogId = setInterval(() => {
-    try {
-      if(Date.now() > until){
-        clearInterval(__unblockWatchdogId);
-        __unblockWatchdogId = null;
-        return;
-      }
-      const locked = (typeof isMonthLocked === 'function') ? isMonthLocked(selYear, selMonth) : false;
-      if(locked) return;
-      const disabledCount = document.querySelectorAll('#main-table input:disabled, #main-table button:disabled, #main-table select:disabled, #main-table textarea:disabled').length;
-      if(disabledCount > 0){
-        forceUnblockEditorUI();
-      }
-    } catch(_) {}
-  }, 200);
-}
-
-// Nach Systemdialogen ("Speichern unter...") kommt der Fokus oft "spaet" zurueck.
-// Dann ggf. automatisch entsperren.
-try {
-  window.addEventListener('focus', () => {
-    setTimeout(() => { try { forceUnblockEditorUI(); startUnblockWatchdog(1500); } catch(_) {} }, 50);
-  });
-  document.addEventListener('visibilitychange', () => {
-    if(!document.hidden){
-      setTimeout(() => { try { forceUnblockEditorUI(); startUnblockWatchdog(1500); } catch(_) {} }, 50);
-    }
-  });
-} catch(_) {}
-
 // Alle gespeicherten Daten löschen
-async function clearAllData(){
+function clearAllData(){
   // Hinweis mit Backup-Info und Bezug auf den aktuellen Monat
   const monthLabel = (selMonth + 1).toString().padStart(2, "0") + "." + selYear;
   const confirmMsg =
@@ -1398,21 +1319,16 @@ async function clearAllData(){
     "und anschließend werden alle Daten dieses Monats gelöscht.\n\n" +
     "Fortfahren?";
 
-
   if (!confirm(confirmMsg)) {
     return;
   }
-
-  setUiBusy(true);
-  try {
 
   // Zuerst automatische Sicherung des aktuellen Monats als JSON
   const data = {
     year: selYear,
     month: selMonth,
     days: {},
-    free: {},
-    locked: {}
+    free: {}
   };
 
   for (let d = 1; d <= selDays; d++) {
@@ -1425,25 +1341,19 @@ async function clearAllData(){
     if (freeVal) data.free[cf] = freeVal;
   }
 
-  // Monatssperre (falls gesetzt)
-  const lockKey = `locked-${selYear}-${selMonth}`;
-  const lockVal = localStorage.getItem(lockKey);
-  if(lockVal != null) data.locked[lockKey] = lockVal;
-
   const backupName = "backup_einnahmen_" +
     selYear + "-" + String(selMonth + 1).padStart(2, "0") + ".json";
 
-  const msg =
-    "Backup für den aktuell ausgewählten Monat (" + monthLabel + ")\n\n" +
-    "Desktop-App: Es erscheint ein \"Speichern unter…\"-Dialog.\n" +
-    "Browser: Die Datei wird in Ihrem Download-Ordner gespeichert.\n\n" +
-    "Vorgeschlagener Dateiname:\n" + backupName;
-
-
-  const ok = await _downloadJsonData(data, backupName, msg);
-  if(!ok){
-    alert("Backup wurde abgebrochen oder konnte nicht gespeichert werden. Es wird nichts gelöscht.");
-    return;
+  try {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = backupName;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.error("Backup konnte nicht erstellt werden:", e);
   }
 
   // Danach nur die Daten des aktuellen Monats aus dem Speicher entfernen
@@ -1453,24 +1363,15 @@ async function clearAllData(){
     const cf = "cf-" + selYear + "-" + selMonth + "-" + d;
     localStorage.removeItem(cf);
   }
-
-  // Wichtig: Monatssperre ebenfalls entfernen, sonst bleibt der Monat nach dem Löschen „gesperrt“
-  localStorage.removeItem(lockKey);
-
   localStorage.removeItem("totalTip");
 
   alert("Backup erstellt. Alle Daten für den Monat " + monthLabel + " wurden gelöscht.");
-
-  // UI sofort wieder freigeben (ohne App-Neustart)
-  try { if (typeof hideMissingDayHint === "function") hideMissingDayHint(); } catch(_) {}
-  try { if (typeof updateMonth === "function") { updateMonth(); } else { location.reload(); } } catch(_) { try { location.reload(); } catch(__) {} }
-  try { if (typeof applyLockStatus === "function") applyLockStatus(); } catch(_) {}
-  } finally {
-    setUiBusy(false);
-    _restoreUiAfterAsyncOp();
-    try { forceUnblockEditorUI(); startUnblockWatchdog(5000); } catch(_) {}
-  }
+  try { hideMissingDayHint(); } catch(e) {}
+  try { updateMonth(); } catch(e) {}
+  try { applyLockStatus(); } catch(e) {}
+  try { if (typeof refocusAfterNativeDialogs === 'function') refocusAfterNativeDialogs(); } catch(e) {}
 }
+
 
 
 // CSV Export
@@ -1544,7 +1445,7 @@ function _getSelectedArchiveYear(){
 function _buildYearArchiveData(year){
   const data = {
     app: "Einnahmen",
-    version: "V246",
+    version: "V249.01.26",
     year: year,
     createdAt: new Date().toISOString(),
     days: {},
@@ -1605,17 +1506,13 @@ async function _downloadJsonData(data, defaultName, promptMessage){
   // 2) Browser: In manchen Offline-Umgebungen ist die prompt-Funktion deaktiviert.
   // Daher verwenden wir ohne Rückfrage den vorgeschlagenen Dateinamen.
   let filename = ensureJsonExt(baseName);
-  const blob = new Blob([jsonText], { type: "application/json" });
+const blob = new Blob([jsonText], {type:"application/json"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.style.display = "none";
   a.href = url;
   a.download = filename;
-  document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  try { window.focus(); } catch(_) {}
+  URL.revokeObjectURL(url);
   return true;
 }
 
@@ -1687,8 +1584,10 @@ function importYearArchive(ev){
         }
       }
 
-      alert("Jahres-Import erfolgreich. Seite wird neu geladen.");
-      location.reload();
+      alert("Jahres-Import erfolgreich.");
+      try { hideMissingDayHint(); } catch(e) {}
+      try { updateMonth(); } catch(e) { console.error(e); }
+      try { populateYearArchiveSelect(); } catch(e) {}
     } catch(err){
       alert("Fehler beim Jahres-Import: " + err.message);
     }
@@ -1708,9 +1607,6 @@ async function archiveAndDeleteYear(){
     "und anschließend werden alle Daten dieses Jahres gelöscht.\n\n" +
     "Fortfahren?";
   if(!confirm(confirmMsg)) return;
-
-  setUiBusy(true);
-  try {
 
   const data = _buildYearArchiveData(year);
   const defaultName = `einnahmen_${year}_gesamt.json`;
@@ -1740,11 +1636,6 @@ async function archiveAndDeleteYear(){
     updateMonth();
   } else {
     populateYearArchiveSelect();
-  }
-  } finally {
-    setUiBusy(false);
-    _restoreUiAfterAsyncOp();
-    try { forceUnblockEditorUI(); startUnblockWatchdog(5000); } catch(_) {}
   }
 }
 
@@ -1852,7 +1743,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 </head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V247 (Offline)</h1>
+<h1>Einnahmen V249.01.26 (Offline)</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span><span id="month-lock-toggle" onclick="toggleLock()" style="cursor:pointer; font-size: 1.4em; margin-left: 10px;" title="Monat bearbeiten/sperren">🔓</span>
@@ -1872,7 +1763,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 <tr>
 <!-- Beschriftung links und Gesamtzahl der Kunden in der letzten Spalte -->
 <!-- Der Text "Gesamtanzahl Kunden:" wird bewusst etwas kleiner dargestellt, bleibt aber schwarz -->
-<td colspan="4" style="text-align: right;
+<td colspan="5" style="text-align: right;
              font-weight: normal;
              color: #000;
              font-size: 0.8em;
@@ -1883,7 +1774,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 </tr>
 <tr>
 <!-- Beschriftung links und Gesamtzahl der Arbeitstage in der letzten Spalte -->
-<td colspan="4" style="text-align: right;
+<td colspan="5" style="text-align: right;
              font-weight: normal;
              color: #000;
              font-size: 0.8em;
@@ -3179,38 +3070,153 @@ function setMonthLocked(year, month, locked) {
 }
 
 function toggleLock() {
-  // Während eines Systemdialogs/Downloads keine Sperre umschalten
-  if (window.__uiBusy) return;
   const locked = isMonthLocked(selYear, selMonth);
   setMonthLocked(selYear, selMonth, !locked);
-  applyLockStatus();
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() => applyLockStatus());
+  } else {
+    setTimeout(() => applyLockStatus(), 0);
+  }
 }
 
 function applyLockStatus() {
   const locked = isMonthLocked(selYear, selMonth);
-  const shouldDisable = locked;
   const lockIcon = document.getElementById("month-lock-toggle");
   if (lockIcon) {
     lockIcon.textContent = locked ? "🔒" : "🔓";
-    lockIcon.title = locked ? "Monat ist gesperrt. Klick zum Entsperren." : "Monat ist offen. Klick zum Sperren.";
+    lockIcon.title = locked
+      ? "Monat ist gesperrt. Klick zum Entsperren."
+      : "Monat ist offen. Klick zum Sperren.";
   }
 
-  document.querySelectorAll("input, button, select, textarea").forEach(el => {
-    if (
-      !el.classList.contains("nav-btn") &&
-      el.id !== "month-lock-toggle" &&
-      !el.closest("#month-nav")
-    ) {
-      el.disabled = shouldDisable;
+  // In Electron kann nach Import/Loeschen gelegentlich ein 'disabled'-Zustand haengen bleiben.
+  // Daher setzen wir IMMER explizit disabled=true/false und entfernen/setzen auch das Attribut.
+  const controls = document.querySelectorAll("input, button, select, textarea");
+  controls.forEach((el) => {
+    try {
+      if (!el) return;
+      // Navigation/Schloss nicht sperren
+      if (el.classList && el.classList.contains("nav-btn")) return;
+      if (el.id === "month-lock-toggle") return;
+      if (el.closest && el.closest("#month-nav")) return;
+
+      el.disabled = !!locked;
+      if (locked) el.setAttribute("disabled", "");
+      else el.removeAttribute("disabled");
+    } catch (_) {
+      // Nichts: einzelne Sonderfaelle sollen die UI nicht blockieren
     }
+  });
+}
+
+// In einigen Electron-Setups kann nach Import/Loeschen ein "interaktivitaets"-Zustand haengen bleiben
+// (z.B. disabled-Attribute, readonly oder ein versehentlich gesetztes "inert").
+// Diese Funktion setzt die UI brutal wieder in einen bearbeitbaren Zustand und wird danach
+// durch applyLockStatus() wieder korrekt (nur bei echtem Monat-Lock) eingeschraenkt.
+function forceEnableEditing() {
+  try {
+    // Druck-/Overlay-Container sicher ausblenden
+    const rp = document.getElementById('reduced-print');
+    if (rp) rp.style.display = 'none';
+
+    // Inert entfernen (falls jemals gesetzt)
+    document.querySelectorAll('[inert]').forEach(el => {
+      try { el.removeAttribute('inert'); } catch(_) {}
+    });
+
+    // Pointer-Events wieder zulassen (falls durch irgendetwas auf none gesetzt)
+    try { document.documentElement.style.pointerEvents = ''; } catch(_) {}
+    try { document.body.style.pointerEvents = ''; } catch(_) {}
+
+    // Alle Controls aktivieren
+    const controls = document.querySelectorAll('input, select, textarea, button');
+    controls.forEach(el => {
+      try {
+        if (!el) return;
+        // Navigation/Schloss immer bedienbar lassen
+        if (el.classList && el.classList.contains('nav-btn')) return;
+        if (el.id === 'month-lock-toggle') return;
+        if (el.closest && el.closest('#month-nav')) return;
+
+        el.disabled = false;
+        el.removeAttribute('disabled');
+        if ('readOnly' in el) el.readOnly = false;
+        el.removeAttribute('readonly');
+      } catch(_) {}
+    });
+
+    // Fokus sanft zurueckholen (Electron verliert nach Dialogen gelegentlich den Fokus)
+    try { window.focus(); } catch(_) {}
+    setTimeout(() => {
+      try {
+        const first = document.querySelector('input.amount1');
+        if (first) first.focus();
+      } catch(_) {}
+    }, 0);
+  } catch (e) {
+    // Niemals die App blockieren
+    console.warn('forceEnableEditing failed:', e);
+  }
+}
+
+// Nach nativen Dialogen (Datei-Auswahl / Alert / Confirm) verliert Electron
+// gelegentlich den Fokus bzw. die Tastatureingabe landet nicht mehr in Inputs.
+// Ein Klick ins Fenster behebt es – wir machen das hier automatisiert.
+function requestAppFocus() {
+  try { window.focus(); } catch (_) {}
+  try {
+    if (window.electronAPI && typeof window.electronAPI.focusWindow === 'function') {
+      window.electronAPI.focusWindow();
+    }
+  } catch (_) {}
+}
+
+function focusFirstEditableField() {
+  try {
+    // Erst das aktuell sichtbare/erste Betrag-1 Feld ansteuern
+    const el = document.querySelector('input.amount1:not([disabled])') ||
+               document.querySelector('input.amount1') ||
+               document.querySelector('input, textarea, select');
+    if (el) {
+      el.focus({ preventScroll: true });
+      if (typeof el.select === 'function') el.select();
+    }
+  } catch (_) {}
+}
+
+function refocusAfterNativeDialogs() {
+  // Mehrere Versuche, weil Windows/Electron den Fokus manchmal zeitversetzt zurueckgibt
+  const delays = [0, 60, 180, 450];
+  delays.forEach(ms => {
+    setTimeout(() => {
+      requestAppFocus();
+      // sicherstellen, dass Controls wirklich aktiv sind
+      try { forceEnableEditing(); } catch (_) {}
+      try { applyLockStatus(); } catch (_) {}
+      focusFirstEditableField();
+    }, ms);
   });
 }
 
 // Sperrstatus beim Monatswechsel anwenden
 const _origUpdateMonth = updateMonth;
 updateMonth = function () {
-  _origUpdateMonth();
-  applyLockStatus();
+  try {
+    _origUpdateMonth();
+  } finally {
+    // Defer, damit wirklich alle dynamischen Elemente im DOM sind
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => {
+        forceEnableEditing();
+        applyLockStatus();
+      });
+    } else {
+      setTimeout(() => {
+        forceEnableEditing();
+        applyLockStatus();
+      }, 0);
+    }
+  }
 };
 
 // Sperrstatus beim JSON-Export berücksichtigen
@@ -3280,8 +3286,29 @@ importJSON = function (ev) {
       if(data.locked === true){
         localStorage.setItem(`locked-${data.year}-${data.month}`, "1");
       }
-      alert("Import erfolgreich. Seite wird neu geladen.");
-      location.reload();
+      /* Import ohne Reload: UI sofort aktualisieren */
+      // Optional: nach Import auf den importierten Monat springen
+      if (data && data.year != null && !Number.isNaN(Number(data.year))) selYear = Number(data.year);
+      if (data && data.month != null && !Number.isNaN(Number(data.month))) selMonth = Number(data.month);
+
+      // Sperrstatus: wenn im Import nicht vorhanden, Monat entsperren (stale locks vermeiden)
+      const importedLocked = (data && Object.prototype.hasOwnProperty.call(data, "locked"))
+        ? (data.locked === true || data.locked === 1 || data.locked === "1")
+        : false;
+      if (typeof setMonthLocked === "function") {
+        setMonthLocked(selYear, selMonth, importedLocked);
+      } else if (importedLocked) {
+        localStorage.setItem(`locked-${selYear}-${selMonth}`, "1");
+      } else {
+        localStorage.removeItem(`locked-${selYear}-${selMonth}`);
+      }
+
+      try { hideMissingDayHint(); } catch(e) {}
+      try { updateMonth(); } catch(e) { console.error(e); }
+      try { applyLockStatus(); } catch(e) {}
+      alert("Import erfolgreich.");
+      try { ev.target.value = ""; } catch(e) {}
+      try { if (typeof refocusAfterNativeDialogs === 'function') refocusAfterNativeDialogs(); } catch(e) {}
     } catch(err) {
       alert("Fehler beim Import: " + err.message);
     }
@@ -3380,11 +3407,12 @@ function generateYearOverview() {
     output += "\n";
     output += "Jahresgesamt " + year + "\n";
     output += "-------------------------\n";
-    output += "Brutto: ".padEnd(13) + fmt(grandTotal).padStart(10) + "\n";
-    output += "Netto: ".padEnd(13) + fmt(netto).padStart(10) + "\n";
-    output += "MwSt: ".padEnd(13) + fmt(mwst).padStart(10) + "\n";
-    output += "Kunden: ".padEnd(13) + String(grandCustomers).padStart(10) + "\n";
-    output += "Arbeitstage: ".padEnd(13) + String(grandWorkdays).padStart(10) + "\n";
+    const labelWidth = 14; // muss mind. so breit sein wie "Arbeitstage:"
+    output += "Brutto:".padEnd(labelWidth) + fmt(grandTotal).padStart(10) + "\n";
+    output += "Netto:".padEnd(labelWidth) + fmt(netto).padStart(10) + "\n";
+    output += "MwSt:".padEnd(labelWidth) + fmt(mwst).padStart(10) + "\n";
+    output += "Kunden:".padEnd(labelWidth) + String(grandCustomers).padStart(10) + "\n";
+    output += "Arbeitstage:".padEnd(labelWidth) + String(grandWorkdays).padStart(10) + "\n";
   } else {
     output += "Für das Jahr " + year + " liegen keine Einträge vor.\n";
   }
