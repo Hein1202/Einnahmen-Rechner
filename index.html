@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V249.01.26</title>
+<title>Einnahmen V260.01.26</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -1445,7 +1445,7 @@ function _getSelectedArchiveYear(){
 function _buildYearArchiveData(year){
   const data = {
     app: "Einnahmen",
-    version: "V249.01.26",
+    version: "V260.01.26",
     year: year,
     createdAt: new Date().toISOString(),
     days: {},
@@ -1743,7 +1743,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 </head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V249.01.26 (Offline)</h1>
+<h1>Einnahmen V260.01.26 (Offline)</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span><span id="month-lock-toggle" onclick="toggleLock()" style="cursor:pointer; font-size: 1.4em; margin-left: 10px;" title="Monat bearbeiten/sperren">🔓</span>
@@ -1921,6 +1921,10 @@ function generateQuarterReducedPrint() {
   let printedTotal = 0;
 
   const labelWidth = 26;
+  // Breite der Datumsspalte für Tageszeilen. Durch die Angleichung an
+  // labelWidth erscheinen die Beträge der Tageszeilen und der
+  // Monats- bzw. Quartalssummen bündig untereinander.
+  const datePadWidth = labelWidth;
   function line(label, value) {
     return label.padEnd(labelWidth) + value.toFixed(2).replace(".", ",").padStart(10) + "\n\n";
   }
@@ -1959,7 +1963,7 @@ function generateQuarterReducedPrint() {
         const label = freeType === "urlaub"
           ? "Urlaubstag"
           : (freeType === "krank" ? "Krankheitstag" : "Eigener freier Tag");
-        output += dateStr.padEnd(12) + label + "\n\n";
+        output += dateStr.padEnd(datePadWidth) + label + "\n\n";
         continue;
       }
 
@@ -2010,7 +2014,7 @@ const kundenLabel = (kunden === 1 ? "Kunde" : "Kunden");
 
 if (kunden === 1) {
   const detailAfter = (zeilenDetails[0] ? "   " + zeilenDetails[0] : "");
-  output += dateStr.padEnd(12)
+  output += dateStr.padEnd(datePadWidth)
     + tagSum.toFixed(2).replace(".", ",").padStart(10)
     + "   |   1 " + kundenLabel
     + detailAfter
@@ -2019,12 +2023,12 @@ if (kunden === 1) {
 
   const maxLines = Math.max(zeilen.length, 1);
   for (let i = 0; i < maxLines; i++) {
-    const datum = i === 0 ? dateStr.padEnd(12) : " ".repeat(12);
+    const datum = i === 0 ? dateStr.padEnd(datePadWidth) : " ".repeat(datePadWidth);
     const einnahme = zeilen[i] || "";
     output += datum + einnahme + "\n";
   }
-  output += " ".repeat(12) + "----------\n";
-  output += " ".repeat(12)
+  output += " ".repeat(datePadWidth) + "----------\n";
+  output += " ".repeat(datePadWidth)
     + tagSum.toFixed(2).replace(".", ",").padStart(10)
     + "   |   " + kunden + " " + kundenLabel + "\n\n";
 }
@@ -2130,6 +2134,28 @@ const rp = document.getElementById("reduced-print");
   function _inferCell(v){
     if (v === null || v === undefined) return { type: "empty", value: "" };
 
+    // Handle custom value objects for Excel export. When v is an object with a
+    // 'v' property, treat that property as the actual cell content and honour
+    // an optional 'isDecimal' flag for number formatting. This allows
+    // exportExcel/exportQuarterExcel to mark monetary values for a number
+    // format with two decimal places while keeping count values unformatted.
+    if (v && typeof v === 'object' && Object.prototype.hasOwnProperty.call(v, 'v')) {
+      const cellVal = v.v;
+      const decimal = !!v.isDecimal;
+      if (cellVal === null || cellVal === undefined) {
+        return { type: "empty", value: "" };
+      }
+      if (typeof cellVal === 'number' && isFinite(cellVal)) {
+        // Return numeric cell and propagate decimal flag so that _buildSheetXml can apply a style.
+        return { type: "n", value: String(cellVal), decimal: decimal };
+      }
+      // Fallback: treat as plain string
+      const sObj = String(cellVal).trim();
+      if (!sObj) return { type: "empty", value: "" };
+      const maybeFormulaObj = /^[=+\-@]/.test(sObj);
+      return { type: "s", value: maybeFormulaObj ? ("'" + sObj) : sObj };
+    }
+
     if (typeof v === "number" && isFinite(v)) {
       return { type: "n", value: String(v) };
     }
@@ -2143,6 +2169,7 @@ const rp = document.getElementById("reduced-print");
 
     const numLike = /^-?(\d+)([\.,]\d+)?$/.test(s);
     if (numLike) {
+      // Versuche, Komma als Dezimaltrennzeichen zu interpretieren und gib einen numerischen Zelltyp zurück.
       const n = parseFloat(s.replace(',', '.'));
       if (isFinite(n)) return { type: "n", value: String(n) };
     }
@@ -2167,7 +2194,15 @@ const rp = document.getElementById("reduced-print");
         const ref = _cellRef(c, r);
 
         if (cell.type === 'n') {
-          out += `<c r="${ref}"><v>${_xlsxEscapeXml(cell.value)}</v></c>`;
+          // Apply a number format style when cell.decimal is true. Style index 1
+          // corresponds to the built‑in number format 0.00 (two decimal places)
+          // declared in styles.xml. Without decimal flag, omit the style
+          // attribute so Excel will use the general format.
+          if (cell.decimal) {
+            out += `<c r="${ref}" s="1"><v>${_xlsxEscapeXml(cell.value)}</v></c>`;
+          } else {
+            out += `<c r="${ref}"><v>${_xlsxEscapeXml(cell.value)}</v></c>`;
+          }
         } else {
           out += `<c r="${ref}" t="inlineStr"><is><t>${_xlsxEscapeXml(cell.value)}</t></is></c>`;
         }
@@ -2306,35 +2341,61 @@ const rp = document.getElementById("reduced-print");
     const safeName = _xlsxSanitizeSheetName(sheetName || 'Tabelle1');
 
     const sheetXml = _buildSheetXml(aoa);
+    // Workbook XML describing the sheet. The workbook itself does not need to
+    // reference styles directly; relationships (relsWb) will handle that.
     const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
       `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
       `<sheets><sheet name="${_xlsxEscapeXml(safeName)}" sheetId="1" r:id="rId1"/></sheets>` +
       `</workbook>`;
 
+    // Root relationships: the workbook is the only target from the package root.
     const relsRoot = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
       `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
       `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>` +
       `</Relationships>`;
 
+    // Workbook relationships: define connections to the sheet and style parts.
     const relsWb = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
       `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
       `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>` +
+      `<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>` +
       `</Relationships>`;
 
+    // Styles XML: include a minimal stylesheet defining a number format with
+    // two decimal places. Style index 0 is the default (general) and index 1
+    // applies built‑in format ID 4 (which corresponds to "#\,##0.00").
+    const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
+      `<fonts count="1"><font><sz val="11"/><color theme="1"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font></fonts>` +
+      `<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>` +
+      `<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>` +
+      `<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>` +
+      `<cellXfs count="2">` +
+        `<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>` +
+        `<xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>` +
+      `</cellXfs>` +
+      `</styleSheet>`;
+
+    // Content types: define overrides for the workbook, worksheet and styles parts.
     const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
       `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
       `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>` +
       `<Default Extension="xml" ContentType="application/xml"/>` +
       `<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>` +
       `<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>` +
+      `<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>` +
       `</Types>`;
 
+    // Assemble all files required for the minimal XLSX package. The order here
+    // does not matter for ZIP packaging, but relationships must match the
+    // definitions above.
     const files = [
       { name: '[Content_Types].xml', data: _u8(contentTypes) },
       { name: '_rels/.rels', data: _u8(relsRoot) },
       { name: 'xl/workbook.xml', data: _u8(workbookXml) },
       { name: 'xl/_rels/workbook.xml.rels', data: _u8(relsWb) },
       { name: 'xl/worksheets/sheet1.xml', data: _u8(sheetXml) },
+      { name: 'xl/styles.xml', data: _u8(stylesXml) },
     ];
 
     return _zipStore(files);
@@ -2456,10 +2517,17 @@ async function exportQuarterExcel() {
           if (sumVal > 0) {
             kunden++;
             const fmt = n => n.toFixed(2).replace(".", ",");
-            const formattedSum = fmt(sumVal);
-            const fmt1 = !isNaN(num1) ? fmt(num1) : "";
-            const fmt2 = !isNaN(num2) && num2 > 0 ? fmt(num2) : "";
-            const fmtTip = !isNaN(numTip) && numTip > 0 ? "Trinkgeld " + fmt(numTip) : "";
+            // Für jede Buchungszeile unterscheiden wir zwischen numerischer Darstellung (für Summen) und Textdarstellung
+            // (für die kombinierten Teile). fmtNum liefert eine Zahl mit zwei Dezimalstellen, fmtStr liefert einen
+            // formatierten String mit deutschem Dezimaltrennzeichen für Texte.
+            const fmtStr = n => n.toFixed(2).replace(".", ",");
+            // Wrap numeric values for Excel export: returns an object marking
+            // monetary values for two‑decimal formatting. See _inferCell.
+            const fmtNum = n => ({ v: Number(n.toFixed(2)), isDecimal: true });
+            const formattedSumObj = fmtNum(sumVal);
+            const fmt1 = !isNaN(num1) ? fmtStr(num1) : "";
+            const fmt2 = !isNaN(num2) && num2 > 0 ? fmtStr(num2) : "";
+            const fmtTip = !isNaN(numTip) && numTip > 0 ? "Trinkgeld " + fmtStr(numTip) : "";
 
             let parts = [];
             if (fmt1) parts.push(fmt1);
@@ -2467,9 +2535,9 @@ async function exportQuarterExcel() {
             if (fmtTip) parts.push(fmtTip);
 
             if (parts.length > 1) {
-              dayLines.push(["", formattedSum, parts.join(" + ")]);
+              dayLines.push(["", formattedSumObj, parts.join(" + ")]);
             } else {
-              dayLines.push(["", formattedSum, ""]);
+              dayLines.push(["", formattedSumObj, ""]);
             }
             tagSum += sumVal;
           }
@@ -2496,7 +2564,9 @@ else {
     });
 
     ws_data.push(["", "----------"]);
-    ws_data.push(["", tagSum.toFixed(2).replace(".", ","), `|   ${kunden} ${kundenLabel}`]);
+    // Tagessumme als Zahl speichern (nicht als Text), um Excel-Warnung zu vermeiden
+    // Tagessumme als Objekt mit Dezimalformat markieren
+    ws_data.push(["", { v: Number(tagSum.toFixed(2)), isDecimal: true }, `|   ${kunden} ${kundenLabel}`]);
     ws_data.push([]);
   }
 
@@ -2507,7 +2577,11 @@ else {
     }
 
     if (monthTotal > 0) {
-      const fmt = n => n.toFixed(2).replace(".", ",");
+      // Für Monatsübersicht im Quartal: Zahlen mit zwei Dezimalstellen als numerische Werte zurückgeben
+      const fmt = n => {
+        const rounded = Number(n.toFixed(2));
+        return { v: rounded, isDecimal: true };
+      };
       const netto = monthTotal / 1.19;
       const mwst = monthTotal - netto;
       ws_data.push([]);
@@ -2515,9 +2589,12 @@ else {
       ws_data.push(["Gesamtsumme", fmt(monthTotal)]);
       ws_data.push(["Netto", fmt(netto)]);
       ws_data.push(["MwSt", fmt(mwst)]);
-      ws_data.push(["Gesamtanzahl Kunden", String(monthCustomers)]);
-            ws_data.push(["Gesamtanzahl Arbeitstage", String(monthWorkdays)]);
-ws_data.push([]);
+      // Die Gesamtzahlen sollen in Spalte C erscheinen. Wir fügen eine leere
+      // Spalte ein und platzieren die Werte in Spalte C.
+      // Gesamtzahlen in Spalte C anstatt D
+      ws_data.push(["Gesamtanzahl Kunden", "", monthCustomers]);
+      ws_data.push(["Gesamtanzahl Arbeitstage", "", monthWorkdays]);
+      ws_data.push([]);
     }
 
     grandTotal += monthTotal;
@@ -2526,7 +2603,11 @@ ws_data.push([]);
   });
 
   if (grandTotal > 0) {
-    const fmt = n => n.toFixed(2).replace(".", ",");
+    // Für die Quartalsübersicht: Zahlen mit zwei Dezimalstellen als numerische Werte zurückgeben
+    const fmt = n => {
+      const rounded = Number(n.toFixed(2));
+      return { v: rounded, isDecimal: true };
+    };
     const netto = grandTotal / 1.19;
     const mwst = grandTotal - netto;
     ws_data.push([]);
@@ -2534,8 +2615,10 @@ ws_data.push([]);
     ws_data.push(["Gesamtsumme", fmt(grandTotal)]);
     ws_data.push(["Netto", fmt(netto)]);
     ws_data.push(["MwSt", fmt(mwst)]);
-    ws_data.push(["Gesamtanzahl Kunden", String(grandCustomers)]);
-      ws_data.push(["Gesamtanzahl Arbeitstage", String(grandWorkdays)]);
+    // Gesamtzahlen des Quartals ebenfalls in Spalte C ausgeben
+    // Gesamtzahlen des Quartals in Spalte C anstatt D
+    ws_data.push(["Gesamtanzahl Kunden", "", grandCustomers]);
+    ws_data.push(["Gesamtanzahl Arbeitstage", "", grandWorkdays]);
 }
   const defaultName = `einnahmen_quartal_Q${q}_${year}.xlsx`;
   await saveAoAToXlsxFile(ws_data, 'Quartal', defaultName);
@@ -2549,6 +2632,24 @@ function generateReducedPrint() {
   let totalCustomers = 0;
   let totalWorkdays = 0;
   let printedTotal = 0;
+
+  // Einheitliche Breite für Datumsspalten: Damit die Beträge der Tageszeilen
+  // und die Beträge in der Monatsübersicht (labelWidth) auf der gleichen
+  // Spalte beginnen, verwenden wir eine deutlich größere Breite für die
+  // Datumsangaben. Ursprünglich wurden die Datumsangaben nur auf eine
+  // Breite von 12 Zeichen aufgefüllt; dies führte dazu, dass die
+  // Monatssummen weiter rechts standen. Mit datePadWidth passen wir die
+  // Breite an labelWidth (26) an, sodass die Werte untereinander stehen.
+  const datePadWidth = 26;
+
+  // Lokale Formatierungsfunktion: Formatiert eine Zahl mit zwei Dezimalstellen
+  // und verwendet ein Komma als Dezimaltrennzeichen. Diese Funktion wird
+  // ausschließlich für den reduzierten Druck verwendet und kollidiert nicht
+  // mit anderen fmt-Definitionen in exportExcel/exportQuarterExcel.
+  const fmt = (n) => {
+    if (typeof n !== 'number' || isNaN(n)) return "";
+    return n.toFixed(2).replace(".", ",");
+  };
 
   for (let d = 1; d <= selDays; d++) {
     const tbody = document.getElementById("day-" + d);
@@ -2576,7 +2677,7 @@ function generateReducedPrint() {
           : (freeType === "krank"
              ? "Krankheitstag"
              : "Eigener freier Tag");
-        output += date.padEnd(12) + label + "\n\n";
+        output += date.padEnd(datePadWidth) + label + "\n\n";
       }
       continue;
     }
@@ -2598,7 +2699,7 @@ function generateReducedPrint() {
       if (sumVal > 0) {
         kunden++;
         // Formatierfunktion für zwei Dezimalstellen mit deutschem Dezimaltrennzeichen
-        const fmt = n => n.toFixed(2).replace(".", ",");
+        // Entfernt: ursprüngliche String-Formatierungsfunktion für Zahlen (nicht mehr benötigt)
         const formattedSum = fmt(sumVal);
         // formatierte Einzelbeträge
         const fmt1 = !isNaN(num1) ? fmt(num1) : "";
@@ -2627,7 +2728,7 @@ const kundenLabel = (kunden === 1 ? "Kunde" : "Kunden");
 
 if (kunden === 1) {
   const detailAfter = (zeilenDetails[0] ? "   " + zeilenDetails[0] : "");
-  output += date.padEnd(12)
+  output += date.padEnd(datePadWidth)
     + tagSum.toFixed(2).replace(".", ",").padStart(10)
     + "   |   1 " + kundenLabel
     + detailAfter
@@ -2636,12 +2737,12 @@ if (kunden === 1) {
 
   const maxLines = Math.max(zeilen.length, 1);
   for (let i = 0; i < maxLines; i++) {
-    const datum = i === 0 ? date.padEnd(12) : " ".repeat(12);
+    const datum = i === 0 ? date.padEnd(datePadWidth) : " ".repeat(datePadWidth);
     const einnahme = zeilen[i] || "";
     output += datum + einnahme + "\n";
   }
-  output += " ".repeat(12) + "----------\n";
-  output += " ".repeat(12)
+  output += " ".repeat(datePadWidth) + "----------\n";
+  output += " ".repeat(datePadWidth)
     + tagSum.toFixed(2).replace(".", ",").padStart(10)
     + "   |   " + kunden + " " + kundenLabel + "\n\n";
 }
@@ -2984,11 +3085,18 @@ async function exportExcel() {
 
       if (sumVal > 0) {
         kunden++;
-        const fmt = n => n.toFixed(2).replace(".", ",");
-        const formattedSum = fmt(sumVal);
-        const fmt1 = !isNaN(num1) ? fmt(num1) : "";
-        const fmt2 = !isNaN(num2) && num2 > 0 ? fmt(num2) : "";
-        const fmtTip = !isNaN(numTip) && numTip > 0 ? "Trinkgeld " + fmt(numTip) : "";
+        // Formatierungsfunktionen: fmtStr liefert einen formatierten String (deutsches Dezimaltrennzeichen) für Texte,
+        // fmtNum liefert eine Zahl mit zwei Dezimalstellen für numerische Excel-Zellen.
+        const fmtStr = n => n.toFixed(2).replace('.', ',');
+        // For numeric Excel cells, wrap the value in an object with
+        // isDecimal=true so the export logic knows to apply a two‑decimal
+        // style. Without wrapping, numbers would use the default format and
+        // drop trailing zeros.
+        const fmtNum = n => ({ v: Number(n.toFixed(2)), isDecimal: true });
+        const formattedSumObj = fmtNum(sumVal);
+        const fmt1 = !isNaN(num1) ? fmtStr(num1) : "";
+        const fmt2 = !isNaN(num2) && num2 > 0 ? fmtStr(num2) : "";
+        const fmtTip = !isNaN(numTip) && numTip > 0 ? "Trinkgeld " + fmtStr(numTip) : "";
 
         let parts = [];
         if (fmt1) parts.push(fmt1);
@@ -2996,9 +3104,9 @@ async function exportExcel() {
         if (fmtTip) parts.push(fmtTip);
 
         if (parts.length > 1) {
-          dayLines.push(["", formattedSum, parts.join(" + ")]);
+          dayLines.push(["", formattedSumObj, parts.join(" + ")]);
         } else {
-          dayLines.push(["", formattedSum, ""]);
+          dayLines.push(["", formattedSumObj, ""]);
         }
 
         tagSum += sumVal;
@@ -3025,7 +3133,9 @@ else {
     });
 
     ws_data.push(["", "----------"]);
-    ws_data.push(["", tagSum.toFixed(2).replace(".", ","), `|   ${kunden} ${kundenLabel}`]);
+    // Tagessumme als Zahl speichern (nicht als Text)
+    // Tagessumme als Objekt mit Dezimalformat markieren
+    ws_data.push(["", { v: Number(tagSum.toFixed(2)), isDecimal: true }, `|   ${kunden} ${kundenLabel}`]);
     ws_data.push([]); // Leere Zeile
   }
 
@@ -3039,7 +3149,14 @@ else {
   const netto = total / 1.19;
   const mwst = total - netto;
 
-  const fmt = n => n.toFixed(2).replace(".", ",");
+  // Für den Excel-Export Zahlen mit zwei Dezimalstellen als numerische Werte zurückgeben.
+  // Der Rückgabewert ist ein Objekt mit dem numerischen Wert und dem Flag
+  // isDecimal=true. So kann _inferCell/_buildSheetXml die Zelle mit dem
+  // passenden Zahlenformat versehen.
+  const fmt = n => {
+    const rounded = Number(n.toFixed(2));
+    return { v: rounded, isDecimal: true };
+  };
 
   ws_data.push([]);
   ws_data.push(["Monatsübersicht"]);
@@ -3047,9 +3164,11 @@ else {
   ws_data.push(["Gesamtsumme:", fmt(total)]);
   ws_data.push(["Netto:", fmt(netto)]);
   ws_data.push(["MwSt (19%):", fmt(mwst)]);
-  ws_data.push(["Gesamtanzahl Kunden:", totalCustomers]);
-
-    ws_data.push(["Gesamtanzahl Arbeitstage:", totalWorkdays]);
+  // Die Gesamtzahlen sollen in Spalte C erscheinen. Wir fügen daher
+  // eine leere Spalte (B) ein und platzieren die Werte in Spalte C.
+      // Verschiebe die Gesamtzahlen eine Spalte nach links (C statt D)
+      ws_data.push(["Gesamtanzahl Kunden:", "", totalCustomers]);
+      ws_data.push(["Gesamtanzahl Arbeitstage:", "", totalWorkdays]);
   const filename = `Einnahmen_${selYear}-${String(selMonth+1).padStart(2,"0")}.xlsx`;
   await saveAoAToXlsxFile(ws_data, 'Einnahmen', filename);
 }
