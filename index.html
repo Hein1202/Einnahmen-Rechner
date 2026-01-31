@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V260.01.26</title>
+<title>Einnahmen V265.01.26</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -222,6 +222,35 @@ input[type="text"]:focus {
   cursor: default;
   padding: 0 4px;
   font-size: 0.95em;
+}
+
+/* Ensure the numeric part of the daily sum in a scroll-to-summary cell
+   has the same font weight and spacing as normal table cells. Without
+   this rule, the sum may appear bolder or cramped when multiple
+   amounts exist for a day because it is wrapped inside a span. */
+.scroll-to-summary .sum-value {
+  /* Make the sum bold and the same size as the input fields when values are entered */
+  font-weight: bold !important;
+  font-size: 1.08em;
+  /* Match the font size of input fields (1.08em) so the sum does not appear
+     smaller when multiple amounts exist. */
+  margin-right: 4px;
+}
+
+/* Always display the Summe column values in bold and with the same font size
+   as the input fields, regardless of whether the scroll arrow is present.
+   This targets the <td> elements with id="sum-<day>". */
+td[id^="sum-"] {
+  font-weight: bold !important;
+  font-size: 1.08em;
+}
+
+/* As an additional safeguard, apply the bold styling to the fifth column
+   (Summe) in all entry rows. This ensures sums remain bold even when
+   the scroll indicator isn't active or the sum cell structure changes. */
+#main-table tr.entry-row > td:nth-child(5) {
+  font-weight: bold;
+  font-size: 1.08em;
 }
 
 /* Kreis mit Pfeil */
@@ -1024,13 +1053,7 @@ function buildTable(){
             </div>
 <button type="button" class="toggle-tip" style="display:none;" style="display:none;" onclick="toggleTipUI(this)">+ TG</button>
           </td>
-          <td class="scroll-to-summary"></td>
-          <td></td>
-        </tr>
-        <tr class="day-summary">
-          <td></td><td></td>
-          <td class="scroll-to-summary"></td>
-          <td id="sum-${day}"></td>
+          <td id="sum-${day}" class="scroll-to-summary"></td>
           <td id="cnt-${day}"></td>
         </tr>
         `;
@@ -1090,8 +1113,19 @@ function updateDay(day){
     if(a1 > 0 || a2 > 0 || tip > 0) customers++;
     sum += a1 + a2 + tip;
   });
-  document.getElementById("sum-" + day).innerText = sum > 0 ? sum.toFixed(2) : "";
-  document.getElementById("cnt-" + day).innerText = customers > 0 ? customers : "";
+  // Update the daily sum cell. If an arrow is present, update only the sum-value span.
+  const sumCell = document.getElementById("sum-" + day);
+  if (sumCell) {
+    const sumSpan = sumCell.querySelector('.sum-value');
+    const newText = sum > 0 ? sum.toFixed(2) : "";
+    if (sumSpan) {
+      sumSpan.textContent = newText;
+    } else {
+      sumCell.innerText = newText;
+    }
+  }
+  const cntCell = document.getElementById("cnt-" + day);
+  if (cntCell) cntCell.innerText = customers > 0 ? customers : "";
 
   saveDay(day);
   updateTotals();
@@ -1445,7 +1479,7 @@ function _getSelectedArchiveYear(){
 function _buildYearArchiveData(year){
   const data = {
     app: "Einnahmen",
-    version: "V260.01.26",
+    version: "V265.01.26",
     year: year,
     createdAt: new Date().toISOString(),
     days: {},
@@ -1743,7 +1777,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 </head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V260.01.26 (Offline)</h1>
+<h1>Einnahmen V265.01.26 (Offline)</h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span><span id="month-lock-toggle" onclick="toggleLock()" style="cursor:pointer; font-size: 1.4em; margin-left: 10px;" title="Monat bearbeiten/sperren">🔓</span>
@@ -2946,21 +2980,38 @@ let currentScrollRow = null;
  * @param {HTMLElement} row The table row (tr.entry-row) to highlight.
  */
 function updateScrollArrow(row) {
-  // Remove arrow from previous row
+  // Remove arrow from previous row but keep the sum text
   if (currentScrollRow && currentScrollRow !== row) {
     const prevCell = currentScrollRow.querySelector('.scroll-to-summary');
     if (prevCell) {
-      prevCell.innerHTML = '';
+      // If a sum-value span exists, restore its text as the only content
+      const sumSpan = prevCell.querySelector('.sum-value');
+      if (sumSpan) {
+        prevCell.textContent = sumSpan.textContent;
+      } else {
+        // Otherwise just clear any arrow markup
+        prevCell.textContent = prevCell.textContent;
+      }
       prevCell.classList.remove('active');
       prevCell.removeAttribute('title');
     }
   }
   currentScrollRow = row;
-  // Set arrow and Text auf der aktuellen Zeile
+  // Set arrow on the current row, preserving the existing sum value
   if (row) {
     const cell = row.querySelector('.scroll-to-summary');
     if (cell) {
-      cell.innerHTML = '<span class="scroll-circle">↓</span><span class="scroll-text"> zur Monatsübersicht</span>';
+      // Capture current sum text; if an existing sum-value span exists, use its content, otherwise use the cell text
+      let currentSumText;
+      const existingSumSpan = cell.querySelector('.sum-value');
+      if (existingSumSpan) {
+        currentSumText = existingSumSpan.textContent;
+      } else {
+        currentSumText = cell.textContent;
+      }
+      cell.innerHTML = `<span class="sum-value">${currentSumText}</span>` +
+                       `<span class="scroll-circle">↓</span>` +
+                       `<span class="scroll-text"> zur Monatsübersicht</span>`;
       cell.classList.add('active');
       cell.setAttribute('title', 'Zur Monatsübersicht scrollen');
     }
@@ -2999,13 +3050,36 @@ function scrollBackToLastEntry() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     return;
   }
-
-  // Ansonsten wie bisher zur zuletzt bearbeiteten Eintragszeile scrollen.
-  if (typeof currentScrollRow !== 'undefined' && currentScrollRow) {
+  // Finde den letzten Tag (höchste Tagesnummer) mit einem Eintrag
+  let lastDayWithData = null;
+  for (let d = selDays; d >= 1; d--) {
+    if (dayHasAnyEntry(d)) {
+      lastDayWithData = d;
+      break;
+    }
+  }
+  if (lastDayWithData != null) {
+    const tbody = document.getElementById("day-" + lastDayWithData);
+    if (tbody) {
+      // Wähle die erste Eintragszeile in diesem Tag
+      const row = tbody.querySelector("tr.entry-row");
+      if (row) {
+        // Setze den Scroll-Indikator auf diese Zeile
+        updateScrollArrow(row);
+        // Scrolle zur Zeile, zentriert im viewport
+        const rect = row.getBoundingClientRect();
+        const rowTop = rect.top + window.pageYOffset;
+        let target = rowTop - (window.innerHeight / 2) + (rect.height / 2);
+        if (target < 0) target = 0;
+        window.scrollTo({ top: target, behavior: 'smooth' });
+        return;
+      }
+    }
+  }
+  // Fallback: wenn currentScrollRow gesetzt ist, dorthin scrollen
+  if (currentScrollRow) {
     const rect = currentScrollRow.getBoundingClientRect();
     const rowTop = rect.top + window.pageYOffset;
-    // Zielposition so berechnen, dass sie nicht kleiner als 0 ist. Wird der Wert
-    // negativ, führt scrollTo sonst nur an den Seitenanfang und nicht mittig.
     let target = rowTop - (window.innerHeight / 2) + (rect.height / 2);
     if (target < 0) target = 0;
     window.scrollTo({ top: target, behavior: 'smooth' });
