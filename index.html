@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V265.01.26</title>
+<title>Einnahmen V267.02.26</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -280,6 +280,47 @@ td[id^="sum-"] {
   gap: 6px;
   cursor: pointer;
   margin-top: 4px;
+}
+
+/* Dezenteres Styling für den Zurück-Pfeil und seine Beschriftung:
+   kleinerer Kreis, dünnerer Rand und hellere Farben. */
+.scroll-back-wrapper .scroll-circle {
+  width: 26px;
+  height: 26px;
+  border-width: 1px;
+  border-radius: 50%;
+  background: #eaf2fb;
+  font-size: 1.1em;
+  color: #244b79;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.scroll-back-wrapper .scroll-text {
+  font-size: 0.9em;
+  color: #244b79;
+  margin-left: 4px;
+}
+
+/* Für den Scroll-Pfeil in der Tagesspalte (zur Monatsübersicht) ein dezenteres Styling:
+   kleinerer Kreis, dünnerer Rand und hellere Farben sowie kleinere Schrift für die Beschriftung. */
+/* Feinere Abmessungen für den Pfeil und Text innerhalb eines Tagessummenfeldes */
+.scroll-to-summary .scroll-circle {
+  width: 22px;
+  height: 22px;
+  border-width: 1px;
+  border-radius: 50%;
+  background: #eaf2fb;
+  font-size: 1em;
+  color: #244b79;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.scroll-to-summary .scroll-text {
+  font-size: 0.85em;
+  color: #244b79;
+  margin-left: 3px;
 }
 .missing-day-hint-inline {
   margin-top: 6px;
@@ -1104,19 +1145,61 @@ function dayKey(day){
 
 // Tag neu berechnen und speichern
 function updateDay(day){
+  // Berechne Summe und Kundenanzahl für den Tag
   let sum = 0;
   let customers = 0;
   document.querySelectorAll("#day-" + day + " .entry-row").forEach(row => {
     const a1 = parseFloat(row.querySelector(".amount1")?.value) || 0;
     const a2 = parseFloat(row.querySelector(".amount2")?.value) || 0;
     const tip = parseFloat(row.querySelector(".amountTip")?.value) || 0;
-    if(a1 > 0 || a2 > 0 || tip > 0) customers++;
+    if (a1 > 0 || a2 > 0 || tip > 0) customers++;
     sum += a1 + a2 + tip;
   });
-  // Update the daily sum cell. If an arrow is present, update only the sum-value span.
+
+  // Positioniere Summen- und Kunden-Zellen in der letzten Eintragszeile
+  try {
+    const tbody = document.getElementById("day-" + day);
+    if (tbody) {
+      const rows = tbody.querySelectorAll("tr.entry-row");
+      if (rows && rows.length > 0) {
+        const lastRow = rows[rows.length - 1];
+        // Bisherige Summen- und Kundenzellen identifizieren und zurücksetzen
+        const currSumCell = document.getElementById("sum-" + day);
+        const currCntCell = document.getElementById("cnt-" + day);
+        if (currSumCell) {
+          currSumCell.removeAttribute("id");
+          currSumCell.classList.remove("scroll-to-summary");
+          currSumCell.innerHTML = "";
+        }
+        if (currCntCell) {
+          currCntCell.removeAttribute("id");
+          currCntCell.innerText = "";
+        }
+        // Stelle sicher, dass die letzte Zeile mindestens 6 Zellen besitzt
+        while (lastRow.children.length < 6) {
+          const td = document.createElement("td");
+          lastRow.appendChild(td);
+        }
+        // Setze neue IDs für Summe und Kunden in der letzten Zeile
+        const newSumCell = lastRow.children[4];
+        const newCntCell = lastRow.children[5];
+        if (newSumCell) {
+          newSumCell.id = "sum-" + day;
+          newSumCell.classList.add("scroll-to-summary");
+        }
+        if (newCntCell) {
+          newCntCell.id = "cnt-" + day;
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Fehler beim Verschieben der Summen-/Kunden-Zellen:", e);
+  }
+
+  // Aktualisiere den Text in den Summe- und Kundenzellen
   const sumCell = document.getElementById("sum-" + day);
   if (sumCell) {
-    const sumSpan = sumCell.querySelector('.sum-value');
+    const sumSpan = sumCell.querySelector(".sum-value");
     const newText = sum > 0 ? sum.toFixed(2) : "";
     if (sumSpan) {
       sumSpan.textContent = newText;
@@ -1125,19 +1208,17 @@ function updateDay(day){
     }
   }
   const cntCell = document.getElementById("cnt-" + day);
-  if (cntCell) cntCell.innerText = customers > 0 ? customers : "";
+  if (cntCell) {
+    cntCell.innerText = customers > 0 ? customers : "";
+  }
 
   saveDay(day);
   updateTotals();
-
-  // Wenn an diesem Tag nun eine Summe > 0 vorhanden ist, prüfen,
-  // ob der vorherige Arbeitstag ohne Eintrag ist.
+  // Prüfe vorherigen Arbeitstag auf fehlende Einträge, wenn Summe vorhanden ist
   if (sum > 0) {
     checkPreviousWorkdayForMissingEntries(day);
   }
-
-  // Falls der aktuell bearbeitete Tag selbst der zuletzt gemeldete
-  // fehlende Tag ist und nun einen Eintrag hat, den Hinweis ausblenden.
+  // Hinweis ausblenden, wenn der zuletzt gemeldete fehlende Tag nun einen Eintrag hat
   if (typeof lastMissingDay !== "undefined" && lastMissingDay === day) {
     if (dayHasAnyEntry(day)) {
       hideMissingDayHint();
@@ -1479,7 +1560,7 @@ function _getSelectedArchiveYear(){
 function _buildYearArchiveData(year){
   const data = {
     app: "Einnahmen",
-    version: "V265.01.26",
+    version: "V267.02.26",
     year: year,
     createdAt: new Date().toISOString(),
     days: {},
@@ -1777,7 +1858,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 </head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V265.01.26 (Offline)</h1>
+<h1>Einnahmen V267.02.26 </h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span><span id="month-lock-toggle" onclick="toggleLock()" style="cursor:pointer; font-size: 1.4em; margin-left: 10px;" title="Monat bearbeiten/sperren">🔓</span>
