@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V268.02.26</title>
+<title>Einnahmen V269.02.26</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -1312,13 +1312,26 @@ function updateTotals(){
   let totalCustomers = 0;
   let totalWorkdays = 0;
 
-  for(let d = 1; d <= selDays; d++){
+  let totalTip = 0;
+
+for(let d = 1; d <= selDays; d++){
     const s = parseFloat(document.getElementById("sum-" + d)?.innerText) || 0;
     const c = parseInt(document.getElementById("cnt-" + d)?.innerText) || 0;
     total += s;
     totalCustomers += c;
     if (c > 0) totalWorkdays++;
   }
+
+
+  // Monatliches Trinkgeld (nur Anzeige auf Seite 1)
+  // Wir lesen direkt aus den Eingabefeldern, damit Import/Toggle sofort sichtbar ist.
+  try {
+    document.querySelectorAll("tbody[id^='day-'] tr.entry-row input.amountTip").forEach((inp) => {
+      const v = (inp && inp.value != null) ? String(inp.value) : "";
+      const n = parseFloat(v.replace(",", "."));
+      if (!isNaN(n)) totalTip += n;
+    });
+  } catch (_) {}
 
   document.getElementById("grand-total").innerText = total.toFixed(2);
 
@@ -1328,7 +1341,11 @@ function updateTotals(){
   const grandWorkdaysEl = document.getElementById("grand-workdays");
   if (grandWorkdaysEl) grandWorkdaysEl.innerText = totalWorkdays;
 
-  const net = total / 1.19;
+  
+  const grandTipEl = document.getElementById("grand-tip");
+  if (grandTipEl) grandTipEl.innerText = totalTip.toFixed(2);
+
+const net = total / 1.19;
   document.getElementById("net-total").innerText = net.toFixed(2);
   document.getElementById("tax-total").innerText = (total - net).toFixed(2);
 
@@ -1570,7 +1587,7 @@ function _getSelectedArchiveYear(){
 function _buildYearArchiveData(year){
   const data = {
     app: "Einnahmen",
-    version: "V268.02.26",
+    version: "V269.02.26",
     year: year,
     createdAt: new Date().toISOString(),
     days: {},
@@ -1868,7 +1885,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 </head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V268.02.26 </h1>
+<h1>Einnahmen V269.02.26 </h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span><span id="month-lock-toggle" onclick="toggleLock()" style="cursor:pointer; font-size: 1.4em; margin-left: 10px;" title="Monat bearbeiten/sperren">🔓</span>
@@ -1908,6 +1925,19 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
   </td>
 <td id="grand-workdays" style="font-weight: bold;">0</td>
 </tr>
+
+<tr id="tip-total-row" class="tip-info-row">
+<!-- Info: Gesamtsumme Trinkgeld (nur Anzeige, nicht Druck/Export) -->
+<td colspan="5" style="text-align: right;
+             font-weight: normal;
+             color: #000;
+             font-size: 0.8em;
+             font-style: italic;">
+    Gesamtsumme&nbsp;Trinkgeld:
+  </td>
+<td id="grand-tip" style="font-weight: bold;">0.00</td>
+</tr>
+
 </table>
 <div style="margin-top:20px;">
 <div id="primary-controls" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
