@@ -3,7 +3,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8"/>
-<title>Einnahmen V267.02.26</title>
+<title>Einnahmen V268.02.26</title>
 <style>
 body { margin:0; padding:0; }
 .container { max-width:600px; margin:0 auto; background:white; padding:20px; }
@@ -1242,6 +1242,16 @@ function loadDay(day){
   const tb = document.getElementById("day-" + day);
   if(!tb) return;
 
+  // Import-/Lade-Schutz:
+  // Manche Dateien enthalten Tagesdaten (day-...) für Tage, die im UI als
+  // Wochenende/Feiertag/Urlaub/Krank markiert sind. Diese Tage besitzen keine
+  // Eingabezeilen (.entry-row). Ohne Schutz würde der Import beim ersten
+  // solchen Tag abbrechen und die übrigen Tage würden nicht mehr geladen.
+  // Daher: Wenn es keine Eingabezeilen gibt, überspringen wir das Laden für
+  // diesen Tag (die Daten bleiben im localStorage erhalten).
+  if(!tb.querySelector(".entry-row")) return;
+
+
   rows.forEach((r, idx) => {
     if(idx > 0) addRow(day);
     const row = tb.querySelectorAll(".entry-row")[idx];
@@ -1560,7 +1570,7 @@ function _getSelectedArchiveYear(){
 function _buildYearArchiveData(year){
   const data = {
     app: "Einnahmen",
-    version: "V267.02.26",
+    version: "V268.02.26",
     year: year,
     createdAt: new Date().toISOString(),
     days: {},
@@ -1858,7 +1868,7 @@ tbody[id^="day-"] tr:last-child td:nth-last-child(2) {
 </head>
 <body class="bg-darkblue" onload="updateMonth()">
 <div class="container">
-<h1>Einnahmen V267.02.26 </h1>
+<h1>Einnahmen V268.02.26 </h1>
 <div id="month-nav">
 <button class="nav-btn" onclick="prevMonth()">◄</button>
 <span id="selected-month"></span><span id="month-lock-toggle" onclick="toggleLock()" style="cursor:pointer; font-size: 1.4em; margin-left: 10px;" title="Monat bearbeiten/sperren">🔓</span>
